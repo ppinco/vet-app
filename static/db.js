@@ -1,23 +1,28 @@
 const VetDB = (function () {
   "use strict";
 
-  const DB_NAME = "VetAppDB";
-  const DB_VERSION = 1;
+  const DB_PREFIX = "VetAppDB_";
   const STORES = ["clienti", "listino", "visite"];
-  const SYNC_KEY = "vet_sync_queue";
   const USER_KEY = "vet_user_id";
 
   let db = null;
+  let currentUser = localStorage.getItem(USER_KEY) || "guest";
 
-  function getUserPrefix() {
-    const uid = localStorage.getItem(USER_KEY) || "guest";
-    return "vet_data_" + uid;
+  function setUser(userId) {
+    currentUser = userId || "guest";
+    localStorage.setItem(USER_KEY, currentUser);
+    db = null; // Forza la riapertura del DB per il nuovo utente
+  }
+
+  function getUser() {
+    return localStorage.getItem(USER_KEY) || "guest";
   }
 
   function open() {
     if (db) return Promise.resolve(db);
+    const dbName = DB_PREFIX + getUser();
     return new Promise((resolve, reject) => {
-      const req = indexedDB.open(DB_NAME, DB_VERSION);
+      const req = indexedDB.open(dbName, 1);
       req.onupgradeneeded = (e) => {
         const d = e.target.result;
         STORES.forEach((s) => {
@@ -33,10 +38,6 @@ const VetDB = (function () {
       req.onsuccess = (e) => { db = e.target.result; resolve(db); };
       req.onerror = (e) => reject(e.target.error);
     });
-  }
-
-  function tx(store, mode) {
-    return db.transaction(store, mode).objectStore(store);
   }
 
   function getAll(storeName) {
@@ -73,6 +74,14 @@ const VetDB = (function () {
     }));
   }
 
+  function deleteItem(storeName, id) {
+    return open().then((d) => new Promise((resolve, reject) => {
+      const req = d.transaction(storeName, "readwrite").objectStore(storeName).delete(id);
+      req.onsuccess = () => resolve();
+      req.onerror = () => reject(req.error);
+    }));
+  }
+
   function clearStore(storeName) {
     return open().then((d) => new Promise((resolve, reject) => {
       const req = d.transaction(storeName, "readwrite").objectStore(storeName).clear();
@@ -88,102 +97,33 @@ const VetDB = (function () {
     });
   }
 
-  function addToSyncQueue(action) {
-    const queue = JSON.parse(localStorage.getItem(SYNC_KEY) || "[]");
-    queue.push({ ...action, timestamp: Date.now() });
-    localStorage.setItem(SYNC_KEY, JSON.stringify(queue));
+  async function exportJSON() {
+    return {
+      clienti: await getAll("clienti"),
+      listino: await getAll("listino"),
+      visite: await getAll("visite"),
+      exported_at: new Date().toISOString()
+    };
   }
 
-  function getSyncQueue() {
-    return JSON.parse(localStorage.getItem(SYNC_KEY) || "[]");
+  async function importJSON(data) {
+    if (data.clienti) await putAll("clienti", data.clienti);
+    if (data.listino) await putAll("listino", data.listino);
+    if (data.visite) await putAll("visite", data.visite);
+    return true;
   }
 
-  function clearSyncQueue() {
-    localStorage.setItem(SYNC_KEY, "[]");
-  }
+  async function getVisiteNonFatturate(clienteId) {
+    const visite = await getAll("visite");
+    const listino = await getAll("listino");
+    const listinoMap = new Map(listino.map(p => [p.id, p.prestazione]));
 
-  async function syncWithServer() {
-    if (!navigator.onLine) return false;
-
-    const queue = getSyncQueue();
-    if (queue.length === 0) return true;
-
-    let allOk = true;
-    for (const action of queue) {
-      try {
-        if (action.type === "add" && action.store === "clienti") {
-          const res = await fetch("/clienti", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(action.data)
-          });
-          if (res.ok) {
-            const result = await res.json();
-            await put("clienti", { ...action.data, id: result.id });
-          } else { allOk = false; }
-        } else if (action.type === "add" && action.store === "listino") {
-          const res = await fetch("/listino", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(action.data)
-          });
-          if (res.ok) {
-            const result = await res.json();
-            await put("listino", { ...action.data, id: result.id });
-          } else { allOk = false; }
-        } else if (action.type === "add" && action.store === "visite") {
-          const res = await fetch("/visite", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(action.data)
-          });
-          if (res.ok) {
-            const result = await res.json();
-            await put("visite", { ...action.data, id: result.id });
-          } else { allOk = false; }
-        } else if (action.type === "fattura") {
-          await fetch("/clienti/" + action.clienteId + "/fattura", { method: "POST" });
-        }
-      } catch (e) {
-        allOk = false;
-      }
-    }
-
-    if (allOk) clearSyncQueue();
-    return allOk;
-  }
-
-  async function pullFromServer() {
-    if (!navigator.onLine) return false;
-    try {
-      const [clientiRes, listinoRes, visiteRes] = await Promise.all([
-        fetch("/clienti"),
-        fetch("/listino"),
-        fetch("/visite")
-      ]);
-      if (!clientiRes.ok || !listinoRes.ok || !visiteRes.ok) return false;
-
-      const [clienti, listino, visite] = await Promise.all([
-        clientiRes.json(),
-        listinoRes.json(),
-        visiteRes.json()
-      ]);
-
-      await putAll("clienti", clienti);
-      await putAll("listino", listino);
-
-      const localVisite = await getAll("visite");
-      const localIds = new Set(localVisite.map((v) => v.id));
-      for (const v of visite) {
-        if (!localIds.has(v.id)) {
-          await put("visite", v);
-        }
-      }
-
-      return true;
-    } catch (e) {
-      return false;
-    }
+    return visite
+      .filter(v => v.cliente_id === parseInt(clienteId, 10) && v.fatturata === 0)
+      .map(v => ({
+        ...v,
+        prestazione: v.prestazione_id ? listinoMap.get(v.prestazione_id) : null
+      }));
   }
 
   return {
@@ -192,15 +132,13 @@ const VetDB = (function () {
     get,
     put,
     putAll,
+    deleteItem,
     clearStore,
     nextId,
-    addToSyncQueue,
-    getSyncQueue,
-    clearSyncQueue,
-    syncWithServer,
-    pullFromServer,
-    getUserPrefix,
-    setUser: (id) => localStorage.setItem(USER_KEY, id),
-    getUser: () => localStorage.getItem(USER_KEY) || null
+    exportJSON,
+    importJSON,
+    getVisiteNonFatturate,
+    setUser,
+    getUser
   };
 })();

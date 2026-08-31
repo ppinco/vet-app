@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="it">
 <head>
@@ -56,7 +55,7 @@
     border-radius: var(--radius);
     box-shadow: 0 1px 3px rgba(0,0,0,.06);
     padding: 18px;
-    max-width: 560px;
+    max-width: 600px;
     margin: 0 auto 16px;
     border: 1px solid var(--border);
   }
@@ -115,7 +114,9 @@
     font-size: .85rem;
   }
   .btn.ghost:hover { background: #f0f6ff; }
-  .btn.small { padding: 9px; width: auto; font-size: .9rem; }
+  .btn.danger { background: #fee2e2; color: var(--red); border: 1px solid #fca5a5; }
+  .btn.danger:hover { background: #fecaca; }
+  .btn.small { padding: 7px 11px; width: auto; font-size: .82rem; }
   .badge {
     display: none;
     align-items: center;
@@ -130,7 +131,6 @@
   .badge.show { display: flex; }
   .badge.success { background: #ecfdf5; color: var(--green); border: 1px solid #bbf7d0; }
   .badge.error { background: #fef2f2; color: var(--red); border: 1px solid #fecaca; }
-  
   .quick-btn-group { display: flex; flex-direction: column; gap: 10px; }
   .quick-section { border-top: 1px solid var(--border); padding-top: 14px; margin-top: 16px; }
   details { border-top: 1px solid var(--border); padding-top: 12px; margin-top: 16px; }
@@ -150,13 +150,13 @@
   .header-nav {
     display: flex;
     justify-content: center;
-    gap: 15px;
+    gap: 12px;
     margin-top: 15px;
     border-bottom: 2px solid var(--border);
     padding-bottom: 10px;
   }
   .nav-link {
-    font-size: .95rem;
+    font-size: .9rem;
     color: var(--muted);
     text-decoration: none;
     font-weight: 600;
@@ -175,6 +175,51 @@
   .content-section { display: none; }
   #nuova-visita-section { display: block; }
   
+  /* Griglia Statistiche Dashboard */
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+  .stat-card {
+    background: #f8fafc;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px;
+    text-align: center;
+  }
+  .stat-card .label { font-size: .75rem; color: var(--muted); font-weight: 600; text-transform: uppercase; }
+  .stat-card .value { font-size: 1.3rem; font-weight: 700; color: var(--primary); margin-top: 2px; }
+  .stat-card .sub-value { font-size: .8rem; color: var(--text); font-weight: 600; }
+
+  /* Tabelle e Liste */
+  .item-list { display: flex; flex-direction: column; gap: 10px; margin-top: 10px; }
+  .item-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: #fff;
+  }
+  .item-info .title { font-weight: 600; font-size: .95rem; }
+  .item-info .meta { font-size: .8rem; color: var(--muted); }
+
+  table.data-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: .85rem;
+    margin-top: 10px;
+  }
+  table.data-table th, table.data-table td {
+    padding: 8px;
+    border-bottom: 1px solid var(--border);
+    text-align: left;
+  }
+  table.data-table th { font-weight: 600; color: var(--muted); }
+
   @media (min-width: 640px) { body { padding: 24px; } }
 </style>
 </head>
@@ -183,8 +228,8 @@
 <!-- SCHERMATA DI BLOCCO (Ospite) -->
 <div id="login-screen">
   <h2>🐾 Accesso Richiesto</h2>
-  <p>Accedi con il tuo account Google per utilizzare VetApp e sincronizzare i dati.</p>
-  <button class="btn primary" style="width: auto; padding: 12px 24px;" id="login-btn-main" type="button">Accedi con Google</button>
+  <p>Inserisci il tuo nome per utilizzare VetApp in locale e salvare i tuoi dati.</p>
+  <button class="btn primary" style="width: auto; padding: 12px 24px;" id="login-btn-main" type="button">Accedi al Profilo</button>
 </div>
 
 <!-- CONTENITORE APP PRINCIPALE (Loggato) -->
@@ -271,24 +316,84 @@
     </details>
   </div>
 
-  <!-- SEZIONE 2: CLIENTI (Da implementare in futuro) -->
+  <!-- SEZIONE 2: CLIENTI (Popolata) -->
   <div id="clienti-section" class="card content-section">
     <h2>🐶 Anagrafica Clienti</h2>
-    <p style="color: var(--muted); font-size: 0.9rem;">Questa sezione mostrerà la lista dei clienti e il loro storico.</p>
+    <div id="clienti-view-list">
+      <div class="field">
+        <input type="text" id="search-clienti" placeholder="Cerca cliente per nome...">
+      </div>
+      <div class="item-list" id="clienti-items"></div>
+    </div>
+
+    <!-- Scheda dettaglio cliente (nascosta di default) -->
+    <div id="cliente-detail-view" style="display:none;">
+      <button class="btn ghost small" id="back-to-clienti-btn" type="button" style="margin-bottom:12px;">&larr; Torna alla Lista</button>
+      <h3 id="detail-cliente-nome"></h3>
+      <div id="detail-cliente-summary" style="margin: 10px 0; font-size: .9rem; color: var(--muted);"></div>
+      <h4>Storico Visite</h4>
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Data</th>
+            <th>Prestazione</th>
+            <th>Prezzo</th>
+            <th>Stato</th>
+          </tr>
+        </thead>
+        <tbody id="detail-visite-body"></tbody>
+      </table>
+    </div>
   </div>
 
-  <!-- SEZIONE 3: LISTINO (Da implementare in futuro) -->
+  <!-- SEZIONE 3: LISTINO (Popolata) -->
   <div id="listino-section" class="card content-section">
-    <h2>💲 Gestione Listino</h2>
-    <p style="color: var(--muted); font-size: 0.9rem;">Questa sezione mostrerà tutte le prestazioni salvate.</p>
+    <h2>💲 Gestione Listino Prestazioni</h2>
+    <form id="add-listino-form" style="margin-bottom: 16px;">
+      <div class="row">
+        <div class="field" style="flex:2;">
+          <label for="listino-item-nome">Prestazione</label>
+          <input type="text" id="listino-item-nome" placeholder="Es. Visita di controllo" required>
+        </div>
+        <div class="field" style="flex:1;">
+          <label for="listino-item-prezzo">Prezzo (€)</label>
+          <input type="number" id="listino-item-prezzo" step="0.01" min="0" placeholder="0.00" required>
+        </div>
+      </div>
+      <button class="btn primary small" type="submit">Aggiungi a Listino</button>
+    </form>
+
+    <div class="item-list" id="listino-items"></div>
   </div>
 
-  <!-- SEZIONE 4: RESOCONTI (Da implementare in futuro) -->
+  <!-- SEZIONE 4: RESOCONTI / DASHBOARD STATISTICHE -->
   <div id="resoconti-section" class="card content-section">
-    <h2>📊 Dashboard Statistiche</h2>
-    <p style="color: var(--muted); font-size: 0.9rem;">Qui vedrai il totale delle visite, gli incassi giornalieri e mensili.</p>
-    <br>
-    <a href="fatture.html" class="btn ghost" style="display: block; text-align: center; text-decoration: none;">Vai alle Fatture</a>
+    <h2>📊 Dashboard Statistiche & Incassi</h2>
+
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="label">Oggi</div>
+        <div class="value" id="stat-incasso-oggi">0.00 €</div>
+        <div class="sub-value" id="stat-visite-oggi">0 visite</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">Settimana</div>
+        <div class="value" id="stat-incasso-settimana">0.00 €</div>
+        <div class="sub-value" id="stat-visite-settimana">0 visite</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">Mese Corrente</div>
+        <div class="value" id="stat-incasso-mese">0.00 €</div>
+        <div class="sub-value" id="stat-visite-mese">0 visite</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">Anno in Corso</div>
+        <div class="value" id="stat-incasso-anno">0.00 €</div>
+        <div class="sub-value" id="stat-visite-anno">0 visite</div>
+      </div>
+    </div>
+
+    <a href="fatture.html" class="btn ghost" style="display: block; text-align: center; text-decoration: none;">Gestisci Visite da Saldata / Fatturazione &rarr;</a>
   </div>
 
 </div>
@@ -307,20 +412,32 @@
   const loginScreen = $("login-screen");
   const appContainer = $("app-container");
   
-  // Navigazione
+  // Navigazione SPA
   const navLinks = document.querySelectorAll('.nav-link');
   const sections = document.querySelectorAll('.content-section');
 
+  function showSection(targetId) {
+    navLinks.forEach(l => {
+      if (l.getAttribute('data-target') === targetId) {
+        l.classList.add('active');
+      } else {
+        l.classList.remove('active');
+      }
+    });
+    sections.forEach(s => s.style.display = 'none');
+    const targetSection = $(targetId);
+    if (targetSection) {
+      targetSection.style.display = 'block';
+      if (targetId === 'clienti-section') loadClientiAnagrafica();
+      if (targetId === 'listino-section') loadListinoGestione();
+      if (targetId === 'resoconti-section') loadDashboardStats();
+    }
+  }
+
   navLinks.forEach(link => {
     link.addEventListener('click', () => {
-      // Rimuove classe active da tutti
-      navLinks.forEach(l => l.classList.remove('active'));
-      sections.forEach(s => s.style.display = 'none');
-      
-      // Aggiunge active a quello cliccato
-      link.classList.add('active');
       const targetId = link.getAttribute('data-target');
-      $(targetId).style.display = 'block';
+      showSection(targetId);
     });
   });
 
@@ -339,6 +456,7 @@
 
   $("data").value = today();
 
+  // Helper per caricare clienti nella select
   async function loadClients() {
     try {
       const data = await VetDB.getAll("clienti");
@@ -355,6 +473,7 @@
     }
   }
 
+  // Helper per caricare prestazioni nella select
   async function loadPrestazioni() {
     try {
       const data = await VetDB.getAll("listino");
@@ -372,7 +491,6 @@
     }
   }
 
-  // Correzione Errore Operatore Logico
   function onPrestazioneChange() {
     const sel = $("prestazione");
     const prezzo = $("prezzo");
@@ -388,7 +506,6 @@
       hint.textContent = "Note obbligatorie per una prestazione personalizzata";
     } else {
       const opt = sel.selectedOptions[0];
-      // Risolto errore di sintassi qui
       prezzo.value = opt.dataset.prezzo || ""; 
       prezzo.placeholder = "0.00";
       note.required = false;
@@ -399,6 +516,7 @@
 
   $("prestazione").addEventListener("change", onPrestazioneChange);
 
+  // Form Salvataggio Visita
   $("visita-form").addEventListener("submit", async (e) => {
     e.preventDefault();
 
@@ -435,6 +553,7 @@
     }
   });
 
+  // Aggiunta rapida Cliente
   $("add-cliente-btn").addEventListener("click", async () => {
     const nomeInput = $("new-cliente-nome").value.trim();
     if (!nomeInput) { showBadge("Inserisci il nome del cliente", "error"); return; }
@@ -456,6 +575,7 @@
     }
   });
 
+  // Aggiunta rapida Prestazione
   $("add-prestazione-btn").addEventListener("click", async () => {
     const prestazione = $("new-prestazione-nome").value.trim();
     const prezzo = parseFloat($("new-prestazione-prezzo").value);
@@ -477,30 +597,226 @@
     }
   });
 
+  // --- SEZIONE CLIENTI (ANAGRAFICA & STORICO) ---
+  async function loadClientiAnagrafica() {
+    $("clienti-view-list").style.display = "block";
+    $("cliente-detail-view").style.display = "none";
+
+    const clienti = await VetDB.getAll("clienti");
+    const filter = $("search-clienti").value.toLowerCase();
+    const container = $("clienti-items");
+    container.innerHTML = "";
+
+    const filtered = clienti.filter(c => 
+      (c.nome + " " + (c.cognome || "")).toLowerCase().includes(filter)
+    );
+
+    if (filtered.length === 0) {
+      container.innerHTML = "<p class='hint' style='text-align:center;'>Nessun cliente trovato.</p>";
+      return;
+    }
+
+    filtered.forEach(c => {
+      const row = document.createElement("div");
+      row.className = "item-row";
+      row.style.cursor = "pointer";
+      row.innerHTML = `
+        <div class="item-info">
+          <div class="title">${escapeHtml(c.nome)} ${escapeHtml(c.cognome || "")}</div>
+          <div class="meta">${escapeHtml(c.telefono || "Nessun telefono")}</div>
+        </div>
+        <button class="btn ghost small" type="button">Vedi Scheda &rarr;</button>
+      `;
+      row.addEventListener("click", () => openClienteDetail(c));
+      container.appendChild(row);
+    });
+  }
+
+  $("search-clienti").addEventListener("input", loadClientiAnagrafica);
+
+  async function openClienteDetail(cliente) {
+    $("clienti-view-list").style.display = "none";
+    $("cliente-detail-view").style.display = "block";
+    $("detail-cliente-nome").textContent = cliente.nome + " " + (cliente.cognome || "");
+
+    const visite = await VetDB.getAll("visite");
+    const listino = await VetDB.getAll("listino");
+    const listinoMap = new Map(listino.map(p => [p.id, p.prestazione]));
+
+    const clienteVisite = visite.filter(v => v.cliente_id === cliente.id);
+    
+    let totaleSpeso = 0;
+    let nonFatturato = 0;
+
+    const tbody = $("detail-visite-body");
+    tbody.innerHTML = "";
+
+    if (clienteVisite.length === 0) {
+      tbody.innerHTML = "<tr><td colspan='4' class='hint' style='text-align:center;'>Nessuna visita registrata per questo cliente.</td></tr>";
+    } else {
+      clienteVisite.sort((a,b) => b.data.localeCompare(a.data)).forEach(v => {
+        totaleSpeso += v.prezzo_applicato;
+        if (v.fatturata === 0) nonFatturato += v.prezzo_applicato;
+
+        const nomePrestazione = v.prestazione_id ? (listinoMap.get(v.prestazione_id) || "Prestazione") : (v.note || "Personalizzata");
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>${v.data}</td>
+          <td>${escapeHtml(nomePrestazione)}</td>
+          <td>${v.prezzo_applicato.toFixed(2)} €</td>
+          <td>${v.fatturata ? '<span style="color:var(--green)">Saldato</span>' : '<span style="color:var(--red)">Da saldare</span>'}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    $("detail-cliente-summary").innerHTML = `
+      Visite Totali: <strong>${clienteVisite.length}</strong> | 
+      Totale Storico: <strong>${totaleSpeso.toFixed(2)} €</strong> | 
+      Da Saldare: <strong style="color: ${nonFatturato > 0 ? 'var(--red)' : 'var(--green)'};">${nonFatturato.toFixed(2)} €</strong>
+    `;
+  }
+
+  $("back-to-clienti-btn").addEventListener("click", () => {
+    $("clienti-view-list").style.display = "block";
+    $("cliente-detail-view").style.display = "none";
+  });
+
+  // --- SEZIONE LISTINO (GESTIONE PRESTAZIONI) ---
+  async function loadListinoGestione() {
+    const listino = await VetDB.getAll("listino");
+    const container = $("listino-items");
+    container.innerHTML = "";
+
+    if (listino.length === 0) {
+      container.innerHTML = "<p class='hint' style='text-align:center;'>Nessuna prestazione a listino.</p>";
+      return;
+    }
+
+    listino.forEach(item => {
+      const row = document.createElement("div");
+      row.className = "item-row";
+      row.innerHTML = `
+        <div class="item-info">
+          <div class="title">${escapeHtml(item.prestazione)}</div>
+          <div class="meta">${Number(item.prezzo_base).toFixed(2)} €</div>
+        </div>
+        <button class="btn danger small" type="button">Elimina</button>
+      `;
+      row.querySelector("button").addEventListener("click", async () => {
+        if (confirm("Eliminare questa prestazione dal listino?")) {
+          await VetDB.deleteItem("listino", item.id);
+          showBadge("Prestazione eliminata", "success");
+          loadListinoGestione();
+          loadPrestazioni();
+        }
+      });
+      container.appendChild(row);
+    });
+  }
+
+  $("add-listino-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const nome = $("listino-item-nome").value.trim();
+    const prezzo = parseFloat($("listino-item-prezzo").value);
+    if (!nome || isNaN(prezzo)) return;
+
+    const newId = await VetDB.nextId("listino");
+    await VetDB.put("listino", { id: newId, prestazione: nome, prezzo_base: prezzo });
+    showBadge("Prestazione salvata a listino ✓", "success");
+    $("listino-item-nome").value = "";
+    $("listino-item-prezzo").value = "";
+    loadListinoGestione();
+    loadPrestazioni();
+  });
+
+  // --- SEZIONE RESOCONTI (DASHBOARD STATISTICHE) ---
+  async function loadDashboardStats() {
+    const visite = await VetDB.getAll("visite");
+    const now = new Date();
+    
+    // Date di riferimento
+    const oggiStr = today();
+    
+    // Inizio settimana (Lunedì)
+    const d = new Date(now);
+    const day = d.getDay();
+    const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+    const lunedi = new Date(d.setDate(diff)).toISOString().slice(0, 10);
+
+    // Inizio Mese
+    const meseInizio = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
+
+    // Inizio Anno
+    const annoInizio = new Date(now.getFullYear(), 0, 1).toISOString().slice(0, 10);
+
+    let stats = {
+      oggi: { count: 0, total: 0 },
+      settimana: { count: 0, total: 0 },
+      mese: { count: 0, total: 0 },
+      anno: { count: 0, total: 0 }
+    };
+
+    visite.forEach(v => {
+      const p = v.prezzo_applicato || 0;
+      if (v.data === oggiStr) {
+        stats.oggi.count++;
+        stats.oggi.total += p;
+      }
+      if (v.data >= lunedi) {
+        stats.settimana.count++;
+        stats.settimana.total += p;
+      }
+      if (v.data >= meseInizio) {
+        stats.mese.count++;
+        stats.mese.total += p;
+      }
+      if (v.data >= annoInizio) {
+        stats.anno.count++;
+        stats.anno.total += p;
+      }
+    });
+
+    $("stat-incasso-oggi").textContent = stats.oggi.total.toFixed(2) + " €";
+    $("stat-visite-oggi").textContent = stats.oggi.count + " visite";
+
+    $("stat-incasso-settimana").textContent = stats.settimana.total.toFixed(2) + " €";
+    $("stat-visite-settimana").textContent = stats.settimana.count + " visite";
+
+    $("stat-incasso-mese").textContent = stats.mese.total.toFixed(2) + " €";
+    $("stat-visite-mese").textContent = stats.mese.count + " visite";
+
+    $("stat-incasso-anno").textContent = stats.anno.total.toFixed(2) + " €";
+    $("stat-visite-anno").textContent = stats.anno.count + " visite";
+  }
+
+  function escapeHtml(str) {
+    if (!str) return "";
+    return str.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+  }
+
   // GESTIONE UI AUTENTICAZIONE E BLOCCO
-  VetAuth.init(); // Chiama init all'avvio
+  VetAuth.init();
 
   VetAuth.onAuth((user) => {
     if (user) {
-      // Utente Loggato: Nascondi schermata di blocco, mostra l'app
       loginScreen.style.display = "none";
       appContainer.style.display = "block";
       
-      $("user-info").textContent = user.name || user.email;
+      $("user-info").textContent = user.name || "Utente";
       loadClients();
       loadPrestazioni();
     } else {
-      // Nessun Utente (Guest): Nascondi l'app, mostra schermata di blocco
       appContainer.style.display = "none";
       loginScreen.style.display = "flex";
-      $("user-info").textContent = "Locale (Guest)";
+      $("user-info").textContent = "Ospite";
     }
   });
 
   $("login-btn-main").addEventListener("click", () => VetAuth.login());
   $("logout-btn").addEventListener("click", () => {
     VetAuth.logout();
-    $("visita-form").reset(); // Pulisce il form al logout per sicurezza
+    $("visita-form").reset(); 
   });
 
   $("export-btn").addEventListener("click", async () => {
@@ -544,5 +860,3 @@
 </script>
 </body>
 </html>
-
-efo
