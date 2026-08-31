@@ -48,6 +48,14 @@
   .stat-card .val { font-size: 1.5rem; font-weight: bold; color: var(--primary); }
   .stat-card .lbl { font-size: 0.75rem; font-weight: 600; color: var(--muted); text-transform: uppercase; margin-top: 4px; }
   .stat-card .sub-val { font-size: 0.9rem; font-weight: bold; margin-top: 4px; color: var(--green); }
+
+  /* Impostazioni speciali per la stampa / PDF */
+  @media print {
+    body { background: #fff; padding: 0; }
+    #login-screen, #app-container, .badge { display: none !important; }
+    #print-area { display: block !important; position: absolute; top: 0; left: 0; width: 100%; padding: 20px; font-size: 14px; }
+    @page { margin: 1cm; }
+  }
 </style>
 </head>
 <body>
@@ -64,8 +72,7 @@
     <div style="margin-top:10px;">
       <span id="user-info" style="font-weight:bold; margin-right:10px;"></span>
       <button class="btn ghost" id="logout-btn">Cambia Utente</button>
-      <button class="btn ghost" id="export-btn">📤 Esporta</button>
-      <label class="btn ghost" style="cursor:pointer;">📥 Importa <input type="file" id="import-file" accept=".json" style="display:none;"></label>
+      <button class="btn ghost" id="export-btn">📤 Export Dati (JSON)</button>
     </div>
     <nav class="header-nav">
       <a class="nav-link active" data-target="nuova-visita-section">📝 Visita</a>
@@ -106,6 +113,10 @@
       <input type="text" id="anagrafica-azienda" placeholder="Ragione Sociale / Azienda (Opzionale)" class="field" style="margin-bottom:10px;">
       <button class="btn ghost small" id="btn-add-anagrafica-cliente">Salva Cliente</button>
     </div>
+    
+    <label>Cerca nei clienti</label>
+    <input type="text" id="cerca-cliente" placeholder="🔍 Cerca per nome, azienda..." class="field">
+    
     <div id="clienti-list">Caricamento...</div>
   </div>
 
@@ -156,17 +167,19 @@
       </div>
     </div>
     
+    <button id="export-excel-btn" class="btn ghost" style="width:100%; margin-top:15px; border-color:var(--green); color:var(--green);">📊 Esporta Visite per Excel (CSV)</button>
+
     <div style="margin-top: 25px; padding: 15px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px;">
       <label style="display:flex; align-items:center; gap:8px; cursor:pointer; margin:0; font-size:1rem;">
         <input type="checkbox" id="auto-backup-chk">
-        <b>💾 Backup Automatico Giornaliero</b>
+        <b>💾 Backup Automatico JSON</b>
       </label>
-      <div style="font-size:0.85rem; color:var(--muted); margin-top:6px;">
-        Se attivo, il tablet scaricherà da solo il file di sicurezza la prima volta che apri l'app ogni giorno.
-      </div>
     </div>
   </div>
 </div>
+
+<!-- Area usata esclusivamente per la stampa PDF -->
+<div id="print-area" style="display:none;"></div>
 <script src="./static/db.js"></script>
 <script src="./static/auth.js"></script>
 <script>
@@ -174,6 +187,7 @@
   const $ = (id) => document.getElementById(id);
   const badge = $("badge");
   let cart = []; 
+  let allClientiCache = []; 
   
   function showBadge(text, type) {
     $("badge-text").textContent = text;
@@ -204,9 +218,9 @@
   });
 
   async function loadClients() {
-    const data = await VetDB.getAll("clienti");
+    allClientiCache = await VetDB.getAll("clienti");
     $("cliente").innerHTML = '<option value="">-- Seleziona Azienda/Cliente --</option>' + 
-      data.map(c => `<option value="${c.id}">${c.nome} ${c.cognome||''} ${c.azienda ? '('+c.azienda+')' : ''}</option>`).join('');
+      allClientiCache.map(c => `<option value="${c.id}">${c.nome} ${c.cognome||''} ${c.azienda ? '('+c.azienda+')' : ''}</option>`).join('');
   }
 
   async function loadPrestazioni() {
@@ -272,10 +286,7 @@
     const n = p ? p.prestazione : "Personalizzata";
     const dIta = formatDateITA(v.data);
     const col = isUnpaid ? 'var(--red)' : 'var(--green)';
-    
-    const checkHtml = isUnpaid 
-      ? `<input type="checkbox" class="chk-salda-${v.cliente_id}" value="${v.id}" style="margin-right:12px;">` 
-      : ``;
+    const checkHtml = isUnpaid ? `<input type="checkbox" class="chk-salda-${v.cliente_id}" value="${v.id}" style="margin-right:12px;" checked>` : ``;
 
     return `<div style="padding:10px 0; border-bottom:1px solid #eaeaea; display:flex; align-items:center;">
       ${checkHtml}
@@ -289,19 +300,60 @@
     </div>`;
   }
 
+  // --- STAMPA RICEVUTA PDF ---
+  window.stampaRicevuta = async (cId) => {
+    const visite = await VetDB.getAll("visite");
+    const listino = await VetDB.getAll("listino");
+    const c = allClientiCache.find(x => x.id === cId);
+    const daSaldare = visite.filter(v => v.cliente_id === cId && !v.fatturata).sort((a,b) => new Date(a.data) - new Date(b.data));
+    
+    if(daSaldare.length === 0) return alert("Nessuna visita in sospeso da stampare.");
+    
+    let tot = 0;
+    let tableRows = daSaldare.map(v => {
+      const p = listino.find(x => x.id === v.prestazione_id);
+      const n = p ? p.prestazione : "Personalizzata";
+      tot += Number(v.prezzo_applicato);
+      return `<tr>
+        <td style="border-bottom:1px solid #ddd; padding:8px;">${formatDateITA(v.data)}</td>
+        <td style="border-bottom:1px solid #ddd; padding:8px;">${n} ${v.note ? '<br><small>'+v.note+'</small>' : ''}</td>
+        <td style="border-bottom:1px solid #ddd; padding:8px; text-align:right;">${v.prezzo_applicato} €</td>
+      </tr>`;
+    }).join("");
+
+    $("print-area").innerHTML = `
+      <div style="max-width:800px; margin:0 auto; color:#000;">
+        <h1 style="text-align:center; color:#2f80ed; margin-bottom:5px;">Ricevuta Prestazioni Veterinarie</h1>
+        <hr style="margin-bottom:20px;">
+        <p><strong>Intestatario:</strong> ${c.nome} ${c.cognome||''} ${c.azienda ? '<br><strong>Azienda:</strong> ' + c.azienda : ''}</p>
+        <p><strong>Data Emissione:</strong> ${new Date().toLocaleDateString('it-IT')}</p>
+        <br>
+        <table style="width:100%; text-align:left; border-collapse:collapse;">
+          <tr style="background:#f4f6f8;">
+            <th style="padding:8px;">Data</th>
+            <th style="padding:8px;">Prestazione / Note</th>
+            <th style="padding:8px; text-align:right;">Importo</th>
+          </tr>
+          ${tableRows}
+        </table>
+        <h2 style="text-align:right; margin-top:20px; color:#ef4444;">Totale da Saldare: ${tot.toFixed(2)} €</h2>
+      </div>
+    `;
+    
+    // Innesca la finestra nativa di stampa (che su mobile permette di salvare come PDF)
+    window.print();
+  };
+
   window.saldaSelezionate = async (cId) => {
     const checkboxes = document.querySelectorAll(`.chk-salda-${cId}:checked`);
-    if(checkboxes.length === 0) return alert("Spunta almeno una visita da segnare come pagata/fatturata.");
-    if(!confirm(`Confermi di segnare come pagate/archiviate ${checkboxes.length} visite?`)) return;
+    if(checkboxes.length === 0) return alert("Nessuna visita selezionata.");
+    if(!confirm(`Segnare come archiviate/fatturate le ${checkboxes.length} visite?`)) return;
 
     const visite = await VetDB.getAll("visite");
     const idsToPay = Array.from(checkboxes).map(c => parseInt(c.value));
 
     for(let v of visite) {
-      if(idsToPay.includes(v.id)) {
-        v.fatturata = 1;
-        await VetDB.put("visite", v);
-      }
+      if(idsToPay.includes(v.id)) { v.fatturata = 1; await VetDB.put("visite", v); }
     }
     showBadge("Visite aggiornate!", "success");
     toggleStorico(cId); 
@@ -321,9 +373,12 @@
     let html = "<div style='padding:10px;'>";
     if(attive.length > 0) {
       const tot = attive.reduce((sum, v) => sum + Number(v.prezzo_applicato), 0);
-      html += `<div style="display:flex; justify-content:space-between; align-items:center; background:#fee2e2; padding:8px; border-radius:6px; margin-bottom:10px;">
+      html += `<div style="display:flex; justify-content:space-between; align-items:center; background:#fee2e2; padding:8px; border-radius:6px; margin-bottom:10px; flex-wrap:wrap; gap:10px;">
         <b style="color:var(--red);">Da Pagare: ${tot.toFixed(2)}€</b>
-        <button onclick="saldaSelezionate(${id})" class="btn primary small" style="width:auto; background:var(--green);">Salda Selezionate</button>
+        <div>
+          <button onclick="stampaRicevuta(${id})" class="btn ghost small" style="margin-right:5px;">📄 Stampa / PDF</button>
+          <button onclick="saldaSelezionate(${id})" class="btn primary small" style="width:auto; background:var(--green);">Salda Selezionate</button>
+        </div>
       </div>`;
       html += attive.map(v => formatVisitaStorico(v, listino, true)).join("");
     } else {
@@ -331,7 +386,7 @@
     }
     
     if(archiviate.length > 0) {
-      html += `<div style="margin-top:15px; font-weight:bold; color:var(--muted);">Archivio (Già Pagate/Fatturate):</div>`;
+      html += `<div style="margin-top:15px; font-weight:bold; color:var(--muted);">Archivio (Già Pagate):</div>`;
       html += archiviate.map(v => formatVisitaStorico(v, listino, false)).join("");
     }
     
@@ -348,29 +403,44 @@
   });
 
   window.modificaCliente = async (id) => {
-    const data = await VetDB.getAll("clienti"); const c = data.find(x => x.id === id); if(!c) return;
+    const c = allClientiCache.find(x => x.id === id); if(!c) return;
     const nNome = prompt("Nome:", c.nome); if (nNome === null) return;
     await VetDB.put("clienti", { ...c, nome: nNome, cognome: prompt("Cognome:", c.cognome || ""), azienda: prompt("Azienda:", c.azienda || "") });
     loadClientiAnagrafica(); loadClients();
   };
 
-  async function loadClientiAnagrafica() {
-    const data = await VetDB.getAll("clienti");
-    $("clienti-list").innerHTML = data.length === 0 ? "Nessun cliente salvato." : 
-      data.map(c => `<div class="list-item" style="flex-direction:column; align-items:flex-start;">
+  // --- MOTORE DI RICERCA CLIENTI ---
+  function renderClientiList(dataList) {
+    $("clienti-list").innerHTML = dataList.length === 0 ? "Nessun cliente trovato." : 
+      dataList.map(c => `<div class="list-item" style="flex-direction:column; align-items:flex-start;">
         <div style="display:flex; justify-content:space-between; width:100%; align-items:center;">
           <div>
             <b style="font-size:1.05rem;">${c.nome} ${c.cognome||''}</b>
             ${c.azienda ? `<div style="font-size:0.85rem; color:var(--muted);">🏢 ${c.azienda}</div>` : ''}
           </div>
           <div style="display:flex; gap:5px;">
-            <button onclick="toggleStorico(${c.id})" class="btn ghost small">Storico / Fatture</button>
+            <button onclick="toggleStorico(${c.id})" class="btn ghost small">Storico</button>
             <button onclick="modificaCliente(${c.id})" class="btn ghost small">Modif.</button>
           </div>
         </div>
         <div id="storico-${c.id}" style="display:none; width:100%; margin-top:10px; background:#f9fafb; border-radius:8px; border:1px solid var(--border); max-height: 350px; overflow-y: auto;"></div>
       </div>`).join('');
   }
+
+  async function loadClientiAnagrafica() {
+    allClientiCache = await VetDB.getAll("clienti");
+    renderClientiList(allClientiCache);
+  }
+
+  $("cerca-cliente").addEventListener("input", (e) => {
+    const q = e.target.value.toLowerCase();
+    const filtrate = allClientiCache.filter(c => 
+      (c.nome && c.nome.toLowerCase().includes(q)) || 
+      (c.cognome && c.cognome.toLowerCase().includes(q)) || 
+      (c.azienda && c.azienda.toLowerCase().includes(q))
+    );
+    renderClientiList(filtrate);
+  });
 
   $("btn-add-listino-prest").addEventListener("click", async () => {
     const n = $("listino-nome").value.trim(); const p = parseFloat($("listino-prezzo").value);
@@ -400,11 +470,9 @@
   $("toggle-privacy-btn").addEventListener("click", () => {
     const content = $("stats-content");
     if(content.style.display === "none") {
-      content.style.display = "block";
-      $("toggle-privacy-btn").innerHTML = "👁️ Nascondi";
+      content.style.display = "block"; $("toggle-privacy-btn").innerHTML = "👁️ Nascondi";
     } else {
-      content.style.display = "none";
-      $("toggle-privacy-btn").innerHTML = "👁️ Mostra";
+      content.style.display = "none"; $("toggle-privacy-btn").innerHTML = "👁️ Mostra";
     }
   });
 
@@ -430,8 +498,37 @@
     $("v-anno").textContent = vY; $("i-anno").textContent = iY.toFixed(2) + "€";
   }
 
-  // --- LOGICA EXPORT/AUTO-BACKUP ---
-  async function eseguiExport() {
+  // --- ESPORTAZIONE EXCEL (CSV) ---
+  $("export-excel-btn").addEventListener("click", async () => {
+    const visite = await VetDB.getAll("visite");
+    const listino = await VetDB.getAll("listino");
+    
+    // Aggiungo il carattere BOM per far capire a Excel che è un file UTF-8 (per gli accenti)
+    let csv = "\uFEFFData,Cliente,Azienda,Prestazione,Prezzo,Note,Stato\n";
+    
+    visite.forEach(v => {
+      const c = allClientiCache.find(x => x.id === v.cliente_id) || {};
+      const p = listino.find(x => x.id === v.prestazione_id) || {};
+      
+      const cName = `"${(c.nome||'')+' '+(c.cognome||'')}"`;
+      const cAz = `"${c.azienda||''}"`;
+      const pName = `"${p.prestazione||'Personalizzata'}"`;
+      const notes = `"${v.note ? v.note.replace(/"/g, '""') : ''}"`;
+      const status = v.fatturata ? "Fatturata/Pagata" : "Da Incassare";
+      
+      csv += `${formatDateITA(v.data)},${cName},${cAz},${pName},${v.prezzo_applicato},${notes},${status}\n`;
+    });
+    
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "VetApp_Visite_Excel_" + new Date().toISOString().split('T')[0] + ".csv";
+    a.click();
+    showBadge("Excel Scaricato", "success");
+  });
+
+  // --- EXPORT JSON E AUTO-BACKUP ---
+  async function eseguiExportJSON() {
     const b = await VetDB.exportJSON(); 
     const a = document.createElement("a");
     a.href = URL.createObjectURL(new Blob([JSON.stringify(b, null, 2)], { type: "application/json" }));
@@ -439,11 +536,6 @@
     a.click();
   }
   
-  $("export-btn").addEventListener("click", async () => {
-    await eseguiExport();
-    showBadge("Backup manuale esportato", "success");
-  });
-
   $("auto-backup-chk").addEventListener("change", (e) => {
     localStorage.setItem("vet_auto_backup", e.target.checked);
     showBadge(e.target.checked ? "Auto-backup Attivato" : "Auto-backup Disattivato", "success");
@@ -456,10 +548,10 @@
       const today = new Date().toISOString().split('T')[0];
       if(localStorage.getItem("vet_last_backup_date") !== today) {
         setTimeout(() => {
-          eseguiExport();
+          eseguiExportJSON();
           localStorage.setItem("vet_last_backup_date", today);
           showBadge("Backup automatico scaricato ✓", "success");
-        }, 2000); // Ritardo per non intralciare il caricamento della grafica
+        }, 2000);
       }
     }
   }
@@ -467,23 +559,14 @@
   VetAuth.init();
   VetAuth.onAuthChange((u) => {
     if(u) { 
-      $("login-screen").style.display = "none"; 
-      $("app-container").style.display = "block"; 
-      $("user-info").textContent = u.name; 
-      loadClients(); loadPrestazioni(); 
-      checkAutoBackup(); // Controlla il backup quando entri
+      $("login-screen").style.display = "none"; $("app-container").style.display = "block"; $("user-info").textContent = u.name; 
+      loadClients(); loadPrestazioni(); checkAutoBackup(); 
     } 
     else { $("login-screen").style.display = "flex"; $("app-container").style.display = "none"; }
   });
   
   $("login-btn-main").addEventListener("click", VetAuth.login); 
   $("logout-btn").addEventListener("click", VetAuth.logout);
-  
-  $("import-file").addEventListener("change", (e) => {
-    const r = new FileReader();
-    r.onload = async (ev) => { await VetDB.importJSON(JSON.parse(ev.target.result)); loadClients(); loadPrestazioni(); showBadge("Dati importati!", "success"); };
-    r.readAsText(e.target.files[0]);
-  });
 })();
 </script>
 </body>
