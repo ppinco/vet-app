@@ -1,3 +1,4 @@
+
 const VetAuth = (function () {
   "use strict";
 
@@ -5,12 +6,16 @@ const VetAuth = (function () {
   let accessToken = null;
   let currentUser = null;
   const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.file";
-  const CLIENT_ID = "";
+  
+  // !!! INSERISCI QUI IL TUO CLIENT ID DI GOOGLE !!!
+  const CLIENT_ID = ""; 
   const onAuthChange = [];
 
-  function init(clientId) {
-    if (!clientId) return;
-    CLIENT_ID_VAL = clientId;
+  function init(clientId = CLIENT_ID) {
+    if (!clientId || clientId === "") {
+      console.error("Client ID Google non configurato. L'app è bloccata.");
+      return;
+    }
 
     const script = document.createElement("script");
     script.src = "https://accounts.google.com/gsi/client";
@@ -29,10 +34,11 @@ const VetAuth = (function () {
     document.head.appendChild(script);
   }
 
-  let CLIENT_ID_VAL = "";
-
   function login() {
-    if (!tokenClient) return;
+    if (!tokenClient) {
+      alert("Autenticazione non configurata correttamente (Client ID mancante).");
+      return;
+    }
     tokenClient.requestAccessToken();
   }
 
@@ -170,3 +176,4 @@ const VetAuth = (function () {
     restoreFromDrive
   };
 })();
+

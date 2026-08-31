@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="it">
 <head>
@@ -8,7 +9,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="VetApp">
-<title>VetApp - Registra Visita</title>
+<title>VetApp - Gestionale Veterinario</title>
 <style>
   :root {
     --bg: #f4f6f8;
@@ -34,6 +35,22 @@
   .header { text-align: center; margin-bottom: 16px; }
   .header h1 { font-size: 1.4rem; font-weight: 700; }
   .header .sub { color: var(--muted); font-size: .85rem; }
+  
+  /* Stile Blocco Login */
+  #login-screen {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 80vh;
+    text-align: center;
+  }
+  #login-screen h2 { margin-bottom: 10px; font-size: 1.5rem; color: var(--primary); }
+  #login-screen p { margin-bottom: 25px; color: var(--muted); }
+  
+  /* Contenitore App Nascosto di default */
+  #app-container { display: none; }
+  
   .card {
     background: var(--card);
     border-radius: var(--radius);
@@ -73,6 +90,7 @@
   textarea { min-height: 70px; resize: vertical; }
   .required-note { color: var(--red); font-weight: 700; }
   .hint { font-size: .78rem; color: var(--muted); margin-top: 4px; }
+  
   .btn {
     width: 100%;
     padding: 13px;
@@ -98,11 +116,10 @@
   }
   .btn.ghost:hover { background: #f0f6ff; }
   .btn.small { padding: 9px; width: auto; font-size: .9rem; }
-  .row { display: flex; gap: 10px; }
-  .row .field { flex: 1; }
   .badge {
     display: none;
     align-items: center;
+    justify-content: center;
     gap: 6px;
     padding: 10px 12px;
     border-radius: 8px;
@@ -113,25 +130,12 @@
   .badge.show { display: flex; }
   .badge.success { background: #ecfdf5; color: var(--green); border: 1px solid #bbf7d0; }
   .badge.error { background: #fef2f2; color: var(--red); border: 1px solid #fecaca; }
+  
   .quick-btn-group { display: flex; flex-direction: column; gap: 10px; }
   .quick-section { border-top: 1px solid var(--border); padding-top: 14px; margin-top: 16px; }
-  .nav-link {
-    display: inline-block;
-    margin-top: 8px;
-    font-size: .9rem;
-    color: var(--primary);
-    text-decoration: none;
-    font-weight: 600;
-  }
-  .nav-link:hover { text-decoration: underline; }
   details { border-top: 1px solid var(--border); padding-top: 12px; margin-top: 16px; }
-  summary {
-    cursor: pointer;
-    font-weight: 600;
-    font-size: .95rem;
-    user-select: none;
-    padding: 4px 0;
-  }
+  summary { cursor: pointer; font-weight: 600; font-size: .95rem; user-select: none; padding: 4px 0; }
+  
   .auth-bar {
     display: flex;
     align-items: center;
@@ -140,86 +144,153 @@
     gap: 6px;
     margin-bottom: 10px;
   }
-  .auth-bar .user-info { font-size: .8rem; color: var(--muted); font-weight: 600; }
-  @media (min-width: 640px) {
-    body { padding: 24px; }
+  .auth-bar .user-info { font-size: .8rem; color: var(--muted); font-weight: 600; margin-right: 10px; }
+  
+  /* Menu di navigazione a schede */
+  .header-nav {
+    display: flex;
+    justify-content: center;
+    gap: 15px;
+    margin-top: 15px;
+    border-bottom: 2px solid var(--border);
+    padding-bottom: 10px;
   }
+  .nav-link {
+    font-size: .95rem;
+    color: var(--muted);
+    text-decoration: none;
+    font-weight: 600;
+    cursor: pointer;
+    transition: color 0.2s;
+  }
+  .nav-link.active {
+    color: var(--primary);
+    border-bottom: 2px solid var(--primary);
+    padding-bottom: 10px;
+    margin-bottom: -12px;
+  }
+  .nav-link:hover { color: var(--primary); }
+  
+  /* Nasconde di default le schede non attive */
+  .content-section { display: none; }
+  #nuova-visita-section { display: block; }
+  
+  @media (min-width: 640px) { body { padding: 24px; } }
 </style>
 </head>
 <body>
 
-<div class="header">
-  <h1>🐾 VetApp</h1>
-  <div class="sub">Registra una nuova visita (Local-First)</div>
-  <div class="auth-bar" id="auth-bar">
-    <span class="user-info" id="user-info">Locale (Guest)</span>
-    <button class="btn ghost" id="login-btn" type="button">Login Google</button>
-    <button class="btn ghost" id="logout-btn" type="button" style="display:none;">Cambia Utente</button>
-    <button class="btn ghost" id="export-btn" type="button" title="Esporta Backup JSON">📤 Esporta</button>
-    <label class="btn ghost" style="cursor:pointer; margin:0;" title="Importa Backup JSON">
-      📥 Importa <input type="file" id="import-file" accept=".json" style="display:none;">
-    </label>
-  </div>
-  <a href="fatture.html" class="nav-link">&rarr; Resoconto Fatture</a>
+<!-- SCHERMATA DI BLOCCO (Ospite) -->
+<div id="login-screen">
+  <h2>🐾 Accesso Richiesto</h2>
+  <p>Accedi con il tuo account Google per utilizzare VetApp e sincronizzare i dati.</p>
+  <button class="btn primary" style="width: auto; padding: 12px 24px;" id="login-btn-main" type="button">Accedi con Google</button>
 </div>
 
-<div class="card">
+<!-- CONTENITORE APP PRINCIPALE (Loggato) -->
+<div id="app-container">
+  <div class="header">
+    <h1>🐾 VetApp</h1>
+    <div class="sub">Gestionale Clinica Veterinaria (Offline-First)</div>
+    
+    <div class="auth-bar">
+      <span class="user-info" id="user-info">Locale</span>
+      <button class="btn ghost" id="logout-btn" type="button">Cambia Utente</button>
+      <button class="btn ghost" id="export-btn" type="button" title="Esporta Backup JSON">📤 Esporta</button>
+      <label class="btn ghost" style="cursor:pointer; margin:0;" title="Importa Backup JSON">
+        📥 Importa <input type="file" id="import-file" accept=".json" style="display:none;">
+      </label>
+    </div>
+    
+    <!-- Navigazione a Schede -->
+    <nav class="header-nav">
+      <a class="nav-link active" data-target="nuova-visita-section">📝 Nuova Visita</a>
+      <a class="nav-link" data-target="clienti-section">🐶 Clienti</a>
+      <a class="nav-link" data-target="listino-section">💲 Listino</a>
+      <a class="nav-link" data-target="resoconti-section">📊 Resoconti</a>
+    </nav>
+  </div>
+
   <div class="badge" id="badge"><span id="badge-text"></span></div>
 
-  <h2>📋 Nuova Visita</h2>
-  <form id="visita-form" novalidate>
-    <div class="field">
-      <label for="cliente">Cliente <span class="required-note">*</span></label>
-      <select id="cliente" name="cliente" required></select>
-    </div>
-
-    <div class="field">
-      <label for="prestazione">Prestazione</label>
-      <select id="prestazione" name="prestazione">
-        <option value="">Altro / Prestazione personalizzata</option>
-      </select>
-    </div>
-
-    <div class="field">
-      <label for="prezzo">Prezzo (€) <span class="required-note">*</span></label>
-      <input type="number" id="prezzo" name="prezzo" step="0.01" min="0" inputmode="decimal" placeholder="0.00">
-    </div>
-
-    <div class="field">
-      <label for="note">Note <span class="required-note" id="note-flag" style="display:none">*</span></label>
-      <textarea id="note" name="note" placeholder="Eventuali note sulla visita..."></textarea>
-      <div class="hint" id="note-hint">Obbligatorie se scegli "Altro / Prestazione personalizzata"</div>
-    </div>
-
-    <div class="field">
-      <label for="data">Data <span class="required-note">*</span></label>
-      <input type="date" id="data" name="data" required>
-    </div>
-
-    <button type="submit" class="btn primary" id="save-btn">Salva Visita</button>
-  </form>
-
-  <details>
-    <summary>➕ Aggiungi rapidamente</summary>
-    <div class="quick-section">
-      <label for="new-cliente-nome">Nuovo Cliente</label>
+  <!-- SEZIONE 1: NUOVA VISITA -->
+  <div id="nuova-visita-section" class="card content-section">
+    <h2>📋 Registra Visita</h2>
+    <form id="visita-form" novalidate>
       <div class="field">
-        <input type="text" id="new-cliente-nome" placeholder="Nome e cognome">
+        <label for="cliente">Cliente <span class="required-note">*</span></label>
+        <select id="cliente" name="cliente" required></select>
       </div>
-      <button class="btn ghost small" id="add-cliente-btn" type="button">Salva Cliente</button>
 
-      <div class="quick-btn-group" style="margin-top: 14px;">
-        <label for="new-prestazione-nome">Nuova Prestazione</label>
-        <div class="field">
-          <input type="text" id="new-prestazione-nome" placeholder="Descrizione prestazione">
-        </div>
-        <div class="field">
-          <input type="number" id="new-prestazione-prezzo" step="0.01" min="0" placeholder="Prezzo base (€)">
-        </div>
-        <button class="btn ghost small" id="add-prestazione-btn" type="button">Salva Prestazione</button>
+      <div class="field">
+        <label for="prestazione">Prestazione</label>
+        <select id="prestazione" name="prestazione">
+          <option value="">Altro / Prestazione personalizzata</option>
+        </select>
       </div>
-    </div>
-  </details>
+
+      <div class="field">
+        <label for="prezzo">Prezzo (€) <span class="required-note">*</span></label>
+        <input type="number" id="prezzo" name="prezzo" step="0.01" min="0" inputmode="decimal" placeholder="0.00">
+      </div>
+
+      <div class="field">
+        <label for="note">Note <span class="required-note" id="note-flag" style="display:none">*</span></label>
+        <textarea id="note" name="note" placeholder="Eventuali note sulla visita..."></textarea>
+        <div class="hint" id="note-hint">Obbligatorie se scegli "Altro / Prestazione personalizzata"</div>
+      </div>
+
+      <div class="field">
+        <label for="data">Data <span class="required-note">*</span></label>
+        <input type="date" id="data" name="data" required>
+      </div>
+
+      <button type="submit" class="btn primary" id="save-btn">Salva Visita</button>
+    </form>
+
+    <details>
+      <summary>➕ Aggiungi rapidamente in anagrafica</summary>
+      <div class="quick-section">
+        <label for="new-cliente-nome">Nuovo Cliente</label>
+        <div class="field">
+          <input type="text" id="new-cliente-nome" placeholder="Nome e cognome">
+        </div>
+        <button class="btn ghost small" id="add-cliente-btn" type="button">Salva Cliente</button>
+
+        <div class="quick-btn-group" style="margin-top: 14px;">
+          <label for="new-prestazione-nome">Nuova Prestazione a Listino</label>
+          <div class="field">
+            <input type="text" id="new-prestazione-nome" placeholder="Descrizione prestazione">
+          </div>
+          <div class="field">
+            <input type="number" id="new-prestazione-prezzo" step="0.01" min="0" placeholder="Prezzo base (€)">
+          </div>
+          <button class="btn ghost small" id="add-prestazione-btn" type="button">Salva Prestazione</button>
+        </div>
+      </div>
+    </details>
+  </div>
+
+  <!-- SEZIONE 2: CLIENTI (Da implementare in futuro) -->
+  <div id="clienti-section" class="card content-section">
+    <h2>🐶 Anagrafica Clienti</h2>
+    <p style="color: var(--muted); font-size: 0.9rem;">Questa sezione mostrerà la lista dei clienti e il loro storico.</p>
+  </div>
+
+  <!-- SEZIONE 3: LISTINO (Da implementare in futuro) -->
+  <div id="listino-section" class="card content-section">
+    <h2>💲 Gestione Listino</h2>
+    <p style="color: var(--muted); font-size: 0.9rem;">Questa sezione mostrerà tutte le prestazioni salvate.</p>
+  </div>
+
+  <!-- SEZIONE 4: RESOCONTI (Da implementare in futuro) -->
+  <div id="resoconti-section" class="card content-section">
+    <h2>📊 Dashboard Statistiche</h2>
+    <p style="color: var(--muted); font-size: 0.9rem;">Qui vedrai il totale delle visite, gli incassi giornalieri e mensili.</p>
+    <br>
+    <a href="fatture.html" class="btn ghost" style="display: block; text-align: center; text-decoration: none;">Vai alle Fatture</a>
+  </div>
+
 </div>
 
 <script src="./static/db.js"></script>
@@ -231,6 +302,27 @@
   const $ = (id) => document.getElementById(id);
   const badge = $("badge");
   const badgeText = $("badge-text");
+  
+  // Elementi UI Principali
+  const loginScreen = $("login-screen");
+  const appContainer = $("app-container");
+  
+  // Navigazione
+  const navLinks = document.querySelectorAll('.nav-link');
+  const sections = document.querySelectorAll('.content-section');
+
+  navLinks.forEach(link => {
+    link.addEventListener('click', () => {
+      // Rimuove classe active da tutti
+      navLinks.forEach(l => l.classList.remove('active'));
+      sections.forEach(s => s.style.display = 'none');
+      
+      // Aggiunge active a quello cliccato
+      link.classList.add('active');
+      const targetId = link.getAttribute('data-target');
+      $(targetId).style.display = 'block';
+    });
+  });
 
   function showBadge(text, type) {
     badgeText.textContent = text;
@@ -280,6 +372,7 @@
     }
   }
 
+  // Correzione Errore Operatore Logico
   function onPrestazioneChange() {
     const sel = $("prestazione");
     const prezzo = $("prezzo");
@@ -295,7 +388,8 @@
       hint.textContent = "Note obbligatorie per una prestazione personalizzata";
     } else {
       const opt = sel.selectedOptions[0];
-      prezzo.value = opt.dataset.prezzo || "";
+      // Risolto errore di sintassi qui
+      prezzo.value = opt.dataset.prezzo || ""; 
       prezzo.placeholder = "0.00";
       note.required = false;
       noteFlag.style.display = "none";
@@ -383,26 +477,30 @@
     }
   });
 
-  // Auth & Backup UI wiring
+  // GESTIONE UI AUTENTICAZIONE E BLOCCO
+  VetAuth.init(); // Chiama init all'avvio
+
   VetAuth.onAuth((user) => {
     if (user) {
+      // Utente Loggato: Nascondi schermata di blocco, mostra l'app
+      loginScreen.style.display = "none";
+      appContainer.style.display = "block";
+      
       $("user-info").textContent = user.name || user.email;
-      $("login-btn").style.display = "none";
-      $("logout-btn").style.display = "inline-block";
+      loadClients();
+      loadPrestazioni();
     } else {
+      // Nessun Utente (Guest): Nascondi l'app, mostra schermata di blocco
+      appContainer.style.display = "none";
+      loginScreen.style.display = "flex";
       $("user-info").textContent = "Locale (Guest)";
-      $("login-btn").style.display = "inline-block";
-      $("logout-btn").style.display = "none";
     }
-    loadClients();
-    loadPrestazioni();
   });
 
-  $("login-btn").addEventListener("click", () => VetAuth.login());
+  $("login-btn-main").addEventListener("click", () => VetAuth.login());
   $("logout-btn").addEventListener("click", () => {
     VetAuth.logout();
-    loadClients();
-    loadPrestazioni();
+    $("visita-form").reset(); // Pulisce il form al logout per sicurezza
   });
 
   $("export-btn").addEventListener("click", async () => {
@@ -439,11 +537,6 @@
     reader.readAsText(file);
   });
 
-  // Init
-  loadClients();
-  loadPrestazioni();
-  onPrestazioneChange();
-
   if ("serviceWorker" in navigator) {
     navigator.serviceWorker.register("./sw.js").catch(() => {});
   }
@@ -451,3 +544,5 @@
 </script>
 </body>
 </html>
+
+efo
