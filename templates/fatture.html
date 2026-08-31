@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VetApp - Resoconto Fatture</title>
+<style>
+  :root {
+    --bg: #f4f6f8;
+    --card: #ffffff;
+    --primary: #2f80ed;
+    --primary-dark: #1f6fdc;
+    --text: #1f2933;
+    --muted: #6b7280;
+    --border: #e2e8f0;
+    --green: #22c55e;
+    --red: #ef4444;
+    --radius: 12px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.5;
+    padding: 16px;
+  }
+  .header { text-align: center; margin-bottom: 16px; }
+  .header h1 { font-size: 1.4rem; font-weight: 700; }
+  .header .sub { color: var(--muted); font-size: .85rem; }
+  .card {
+    background: var(--card);
+    border-radius: var(--radius);
+    box-shadow: 0 1px 3px rgba(0,0,0,.06);
+    padding: 18px;
+    max-width: 640px;
+    margin: 0 auto 16px;
+    border: 1px solid var(--border);
+  }
+  .card h2 {
+    font-size: 1.05rem;
+    font-weight: 600;
+    margin-bottom: 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  label { display: block; font-size: .85rem; font-weight: 600; margin-bottom: 5px; color: var(--text); }
+  .field { margin-bottom: 14px; }
+  select {
+    width: 100%;
+    padding: 11px 12px;
+    font-size: 1rem;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: #fff;
+    color: var(--text);
+    appearance: none;
+    -webkit-appearance: none;
+    outline: none;
+    transition: border-color .15s, box-shadow .15s;
+  }
+  select:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(47,128,237,.15);
+  }
+  .btn {
+    width: 100%;
+    padding: 13px;
+    font-size: 1rem;
+    font-weight: 600;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    background: var(--primary);
+    color: #fff;
+    transition: background .15s, transform .05s;
+  }
+  .btn:active { transform: scale(.98); }
+  .btn.primary { background: var(--primary); }
+  .btn.primary:hover { background: var(--primary-dark); }
+  .btn.ghost {
+    background: #fff;
+    color: var(--primary);
+    border: 1px solid var(--border);
+  }
+  .btn.ghost:hover { background: #f0f6ff; }
+  .btn:disabled { opacity: .5; cursor: not-allowed; }
+  .nav-link {
+    display: inline-block;
+    margin-bottom: 12px;
+    font-size: .9rem;
+    color: var(--primary);
+    text-decoration: none;
+    font-weight: 600;
+  }
+  .nav-link:hover { text-decoration: underline; }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: .9rem;
+    margin-bottom: 12px;
+  }
+  th, td {
+    text-align: left;
+    padding: 10px 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  th {
+    font-weight: 600;
+    color: var(--muted);
+    font-size: .8rem;
+    text-transform: uppercase;
+    letter-spacing: .03em;
+  }
+  .empty-msg {
+    text-align: center;
+    color: var(--muted);
+    padding: 24px 0;
+    font-size: .9rem;
+  }
+  .totale-box {
+    background: #f0f6ff;
+    border: 1px solid #bfdbfe;
+    border-radius: 10px;
+    padding: 16px;
+    text-align: center;
+    margin-bottom: 16px;
+  }
+  .totale-box .label { font-size: .85rem; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .03em; }
+  .totale-box .amount { font-size: 1.6rem; font-weight: 700; color: var(--primary); margin-top: 4px; }
+  .badge {
+    display: none;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    font-size: .9rem;
+    font-weight: 600;
+    margin-bottom: 12px;
+  }
+  .badge.show { display: flex; }
+  .badge.success { background: #ecfdf5; color: var(--green); border: 1px solid #bbf7d0; }
+  .badge.error { background: #fef2f2; color: var(--red); border: 1px solid #fecaca; }
+  @media (min-width: 640px) {
+    body { padding: 24px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>🐾 VetApp</h1>
+  <div class="sub">Resoconto Fatture</div>
+</div>
+
+<div class="card">
+  <a href="/" class="nav-link">&larr; Torna a Registra Visita</a>
+  <div class="badge" id="badge"><span id="badge-text"></span></div>
+
+  <h2>📄 Visite Non Fatturate</h2>
+
+  <div class="field">
+    <label for="cliente">Cliente</label>
+    <select id="cliente">
+      <option value="">-- Seleziona cliente --</option>
+    </select>
+  </div>
+
+  <div id="tabella-wrap" style="display:none;">
+    <table>
+      <thead>
+        <tr>
+          <th>Data</th>
+          <th>Prestazione</th>
+          <th style="text-align:right;">Prezzo</th>
+        </tr>
+      </thead>
+      <tbody id="visite-body"></tbody>
+    </table>
+
+    <div class="totale-box">
+      <div class="label">Totale da fatturare</div>
+      <div class="amount" id="totale">0,00 &euro;</div>
+    </div>
+
+    <button class="btn primary" id="fattura-btn" disabled>Segna come Fatturate</button>
+  </div>
+
+  <div class="empty-msg" id="empty-msg" style="display:none;">Nessuna visita non fatturata per questo cliente.</div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  const $ = (id) => document.getElementById(id);
+  const badge = $("badge");
+  const badgeText = $("badge-text");
+
+  function showBadge(text, type) {
+    badgeText.textContent = text;
+    badge.className = "badge show " + type;
+    setTimeout(() => badge.classList.remove("show"), 3500);
+  }
+
+  async function loadClients() {
+    try {
+      const res = await fetch("/clienti");
+      const data = await res.json();
+      const sel = $("cliente");
+      sel.innerHTML = '<option value="">-- Seleziona cliente --</option>';
+      data.forEach((c) => {
+        const opt = document.createElement("option");
+        opt.value = c.id;
+        opt.textContent = c.nome + " " + (c.cognome || "");
+        sel.appendChild(opt);
+      });
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  async function loadVisite() {
+    const clienteId = $("cliente").value;
+    if (!clienteId) {
+      $("tabella-wrap").style.display = "none";
+      $("empty-msg").style.display = "none";
+      $("fattura-btn").disabled = true;
+      return;
+    }
+
+    try {
+      const res = await fetch("/clienti/" + clienteId + "/visite-non-fatturate");
+      const data = await res.json();
+      const tbody = $("visite-body");
+      tbody.innerHTML = "";
+
+      if (data.length === 0) {
+        $("tabella-wrap").style.display = "none";
+        $("empty-msg").style.display = "block";
+        $("fattura-btn").disabled = true;
+        return;
+      }
+
+      let totale = 0;
+      data.forEach((v) => {
+        totale += v.prezzo_applicato;
+        const tr = document.createElement("tr");
+        const desc = v.prestazione || v.note || "N/D";
+        tr.innerHTML =
+          "<td>" + escapeHtml(v.data) + "</td>" +
+          "<td>" + escapeHtml(desc) + "</td>" +
+          "<td style='text-align:right;'>" + Number(v.prezzo_applicato).toFixed(2) + " &euro;</td>";
+        tbody.appendChild(tr);
+      });
+
+      $("totale").textContent = totale.toFixed(2).replace(".", ",") + " \u20ac";
+      $("tabella-wrap").style.display = "block";
+      $("empty-msg").style.display = "none";
+      $("fattura-btn").disabled = false;
+    } catch (e) {
+      console.error(e);
+      showBadge("Errore nel caricamento visite", "error");
+    }
+  }
+
+  function escapeHtml(str) {
+    if (!str) return "";
+    return str.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+  }
+
+  $("cliente").addEventListener("change", loadVisite);
+
+  $("fattura-btn").addEventListener("click", async () => {
+    const clienteId = $("cliente").value;
+    if (!clienteId) return;
+
+    const btn = $("fattura-btn");
+    btn.disabled = true;
+    btn.textContent = "Elaborazione...";
+
+    try {
+      const res = await fetch("/clienti/" + clienteId + "/fattura", { method: "POST" });
+      if (!res.ok) throw new Error();
+      showBadge("Visite segnate come fatturate ✓", "success");
+      await loadVisite();
+    } catch (e) {
+      showBadge("Errore durante la fatturazione", "error");
+      btn.disabled = false;
+      btn.textContent = "Segna come Fatturate";
+    }
+  });
+
+  loadClients();
+})();
+</script>
+</body>
+</html>

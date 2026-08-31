@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#2f80ed">
+<link rel="manifest" href="/manifest.json">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="VetApp">
+<title>VetApp - Registra Visita</title>
+<style>
+  :root {
+    --bg: #f4f6f8;
+    --card: #ffffff;
+    --primary: #2f80ed;
+    --primary-dark: #1f6fdc;
+    --text: #1f2933;
+    --muted: #6b7280;
+    --border: #e2e8f0;
+    --green: #22c55e;
+    --red: #ef4444;
+    --radius: 12px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.5;
+    padding: 16px;
+  }
+  .header { text-align: center; margin-bottom: 16px; }
+  .header h1 { font-size: 1.4rem; font-weight: 700; }
+  .header .sub { color: var(--muted); font-size: .85rem; }
+  .card {
+    background: var(--card);
+    border-radius: var(--radius);
+    box-shadow: 0 1px 3px rgba(0,0,0,.06);
+    padding: 18px;
+    max-width: 560px;
+    margin: 0 auto 16px;
+    border: 1px solid var(--border);
+  }
+  .card h2 {
+    font-size: 1.05rem;
+    font-weight: 600;
+    margin-bottom: 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  label { display: block; font-size: .85rem; font-weight: 600; margin-bottom: 5px; color: var(--text); }
+  .field { margin-bottom: 14px; }
+  input, select, textarea {
+    width: 100%;
+    padding: 11px 12px;
+    font-size: 1rem;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: #fff;
+    color: var(--text);
+    appearance: none;
+    -webkit-appearance: none;
+    outline: none;
+    transition: border-color .15s, box-shadow .15s;
+  }
+  input:focus, select:focus, textarea:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(47,128,237,.15);
+  }
+  textarea { min-height: 70px; resize: vertical; }
+  .required-note { color: var(--red); font-weight: 700; }
+  .hint { font-size: .78rem; color: var(--muted); margin-top: 4px; }
+  .btn {
+    width: 100%;
+    padding: 13px;
+    font-size: 1rem;
+    font-weight: 600;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    background: var(--primary);
+    color: #fff;
+    transition: background .15s, transform .05s;
+  }
+  .btn:active { transform: scale(.98); }
+  .btn.primary { background: var(--primary); }
+  .btn.primary:hover { background: var(--primary-dark); }
+  .btn.ghost {
+    background: #fff;
+    color: var(--primary);
+    border: 1px solid var(--border);
+  }
+  .btn.ghost:hover { background: #f0f6ff; }
+  .btn.small { padding: 9px; width: auto; font-size: .9rem; }
+  .row { display: flex; gap: 10px; }
+  .row .field { flex: 1; }
+  .badge {
+    display: none;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    font-size: .9rem;
+    font-weight: 600;
+    margin-bottom: 12px;
+  }
+  .badge.show { display: flex; }
+  .badge.success { background: #ecfdf5; color: var(--green); border: 1px solid #bbf7d0; }
+  .badge.error { background: #fef2f2; color: var(--red); border: 1px solid #fecaca; }
+  .quick-btn-group { display: flex; flex-direction: column; gap: 10px; }
+  .quick-section { border-top: 1px solid var(--border); padding-top: 14px; margin-top: 16px; }
+  .nav-link {
+    display: inline-block;
+    margin-top: 8px;
+    font-size: .9rem;
+    color: var(--primary);
+    text-decoration: none;
+    font-weight: 600;
+  }
+  .nav-link:hover { text-decoration: underline; }
+  details { border-top: 1px solid var(--border); padding-top: 12px; margin-top: 16px; }
+  summary {
+    cursor: pointer;
+    font-weight: 600;
+    font-size: .95rem;
+    user-select: none;
+    padding: 4px 0;
+  }
+  .hidden-form { margin-top: 12px; }
+  .auth-bar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 14px;
+  }
+  .auth-bar .user-info { font-size: .85rem; color: var(--muted); font-weight: 600; }
+  .auth-bar .btn { width: auto; padding: 8px 14px; font-size: .85rem; font-weight: 600; }
+  .sync-status { font-size: .78rem; color: var(--muted); margin-top: 4px; }
+  @media (min-width: 640px) {
+    body { padding: 24px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>🐾 VetApp</h1>
+  <div class="sub">Registra una nuova visita</div>
+  <div class="auth-bar" id="auth-bar">
+    <span class="user-info" id="user-info">Local / Disconnesso</span>
+    <button class="btn ghost" id="login-btn" type="button">Accesso Google</button>
+    <button class="btn ghost" id="logout-btn" type="button" style="display:none;">Esci</button>
+    <button class="btn ghost" id="backup-btn" type="button">💾 Backup Drive</button>
+    <button class="btn ghost" id="restore-btn" type="button">↩ Ripristina</button>
+  </div>
+  <div class="sync-status" id="sync-status"></div>
+  <a href="/fatture" class="nav-link">&rarr; Resoconto Fatture</a>
+</div>
+
+<div class="card">
+  <div class="badge" id="badge"><span id="badge-text"></span></div>
+
+  <h2>📋 Nuova Visita</h2>
+  <form id="visita-form" novalidate>
+    <div class="field">
+      <label for="cliente">Cliente <span class="required-note">*</span></label>
+      <select id="cliente" name="cliente" required></select>
+    </div>
+
+    <div class="field">
+      <label for="prestazione">Prestazione</label>
+      <select id="prestazione" name="prestazione">
+        <option value="">Altro / Prestazione personalizzata</option>
+      </select>
+    </div>
+
+    <div class="field">
+      <label for="prezzo">Prezzo (€) <span class="required-note">*</span></label>
+      <input type="number" id="prezzo" name="prezzo" step="0.01" min="0" inputmode="decimal" placeholder="0.00">
+    </div>
+
+    <div class="field">
+      <label for="note">Note <span class="required-note" id="note-flag" style="display:none">*</span></label>
+      <textarea id="note" name="note" placeholder="Eventuali note sulla visita..."></textarea>
+      <div class="hint" id="note-hint">Obbligatorie se scegli "Altro / Prestazione personalizzata"</div>
+    </div>
+
+    <div class="field">
+      <label for="data">Data <span class="required-note">*</span></label>
+      <input type="date" id="data" name="data" required>
+    </div>
+
+    <button type="submit" class="btn primary" id="save-btn">Salva Visita</button>
+  </form>
+
+  <details>
+    <summary>➕ Aggiungi rapidamente</summary>
+    <div class="quick-section">
+      <label for="new-cliente-nome">Nuovo Cliente</label>
+      <div class="field">
+        <input type="text" id="new-cliente-nome" placeholder="Nome e cognome">
+      </div>
+      <button class="btn ghost small" id="add-cliente-btn">Salva Cliente</button>
+
+      <div class="quick-btn-group" style="margin-top: 14px;">
+        <label for="new-prestazione-nome">Nuova Prestazione</label>
+        <div class="field">
+          <input type="text" id="new-prestazione-nome" placeholder="Descrizione prestazione">
+        </div>
+        <div class="field">
+          <input type="number" id="new-prestazione-prezzo" step="0.01" min="0" placeholder="Prezzo base (€)">
+        </div>
+        <button class="btn ghost small" id="add-prestazione-btn">Salva Prestazione</button>
+      </div>
+    </div>
+  </details>
+</div>
+
+<script src="/static/db.js"></script>
+<script src="/static/auth.js"></script>
+<script>
+(function () {
+  "use strict";
+
+  const $ = (id) => document.getElementById(id);
+  const badge = $("badge");
+  const badgeText = $("badge-text");
+
+  function showBadge(text, type) {
+    badgeText.textContent = text;
+    badge.className = "badge show " + type;
+    setTimeout(() => badge.classList.remove("show"), 3500);
+  }
+
+  function today() {
+    const d = new Date();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return d.getFullYear() + "-" + m + "-" + day;
+  }
+
+  $("data").value = today();
+
+  async function loadClients() {
+    try {
+      const res = await fetch("/clienti");
+      const data = await res.json();
+      const sel = $("cliente");
+      sel.innerHTML = '<option value="">-- Seleziona cliente --</option>';
+      data.forEach((c) => {
+        const opt = document.createElement("option");
+        opt.value = c.id;
+        opt.textContent = c.nome + " " + (c.cognome || "");
+        sel.appendChild(opt);
+      });
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  async function loadPrestazioni() {
+    try {
+      const res = await fetch("/listino");
+      const data = await res.json();
+      const sel = $("prestazione");
+      sel.innerHTML = '<option value="">Altro / Prestazione personalizzata</option>';
+      data.forEach((p) => {
+        const opt = document.createElement("option");
+        opt.value = p.id;
+        opt.textContent = p.prestazione + " (" + Number(p.prezzo_base).toFixed(2) + " €)";
+        opt.dataset.prezzo = p.prezzo_base;
+        sel.appendChild(opt);
+      });
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  function onPrestazioneChange() {
+    const sel = $("prestazione");
+    const prezzo = $("prezzo");
+    const note = $("note");
+    const noteFlag = $("note-flag");
+    const hint = $("note-hint");
+
+    if (!sel.value) {
+      prezzo.value = "";
+      prezzo.placeholder = "Inserisci prezzo manualmente";
+      note.required = true;
+      noteFlag.style.display = "inline";
+      hint.textContent = "Note obbligatorie per una prestazione personalizzata";
+    } else {
+      const opt = sel.selectedOptions[0];
+      prezzo.value = opt.dataset.prezzo || "";
+      prezzo.placeholder = "0.00";
+      note.required = false;
+      noteFlag.style.display = "none";
+      hint.textContent = "Obbligatorie se scegli 'Altro / Prestazione personalizzata'";
+    }
+  }
+
+  $("prestazione").addEventListener("change", onPrestazioneChange);
+
+  $("visita-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+
+    const clienteId = $("cliente").value;
+    const prestazioneId = $("prestazione").value;
+    const prezzo = parseFloat($("prezzo").value);
+    const note = $("note").value.trim();
+    const data = $("data").value;
+
+    if (!clienteId) { showBadge("Seleziona un cliente", "error"); return; }
+    if (isNaN(prezzo) || prezzo < 0) { showBadge("Inserisci un prezzo valido", "error"); return; }
+    if (!prestazioneId && !note) { showBadge("Inserisci una nota per la prestazione personalizzata", "error"); return; }
+
+    const payload = {
+      cliente_id: clienteId,
+      prestazione_id: prestazioneId ? prestazioneId : null,
+      prezzo_applicato: prezzo,
+      note: note,
+      data: data
+    };
+
+    const btn = $("save-btn");
+    btn.disabled = true;
+    btn.textContent = "Salvataggio...";
+
+    try {
+      const res = await fetch("/visite", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      if (!res.ok) throw new Error("Errore server");
+      showBadge("Visita salvata con successo ✓", "success");
+      $("visita-form").reset();
+      $("data").value = today();
+      onPrestazioneChange();
+    } catch (err) {
+      showBadge("Errore durante il salvataggio", "error");
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "Salva Visita";
+    }
+  });
+
+  $("add-cliente-btn").addEventListener("click", async () => {
+    const nome = $("new-cliente-nome").value.trim();
+    if (!nome) { showBadge("Inserisci il nome del cliente", "error"); return; }
+    const parts = nome.split(/\s+/);
+    const cognome = parts.length > 1 ? parts.pop() : "";
+    const nomeFit = parts.join(" ");
+    if (!nomeFit) { showBadge("Inserisci almeno nome e cognome", "error"); return; }
+
+    try {
+      const res = await fetch("/clienti", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ nome: nomeFit, cognome: cognome })
+      });
+      if (!res.ok) throw new Error();
+      showBadge("Cliente aggiunto ✓", "success");
+      $("new-cliente-nome").value = "";
+      await loadClients();
+      const data = await res.clone().json();
+      $("cliente").value = String(data.id);
+    } catch (e) {
+      showBadge("Errore aggiunta cliente", "error");
+    }
+  });
+
+  $("add-prestazione-btn").addEventListener("click", async () => {
+    const prestazione = $("new-prestazione-nome").value.trim();
+    const prezzo = parseFloat($("new-prestazione-prezzo").value);
+    if (!prestazione) { showBadge("Inserisci la descrizione", "error"); return; }
+    if (isNaN(prezzo) || prezzo < 0) { showBadge("Inserisci un prezzo base valido", "error"); return; }
+
+    try {
+      const res = await fetch("/listino", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prestazione: prestazione, prezzo_base: prezzo })
+      });
+      if (!res.ok) throw new Error();
+      showBadge("Prestazione aggiunta ✓", "success");
+      $("new-prestazione-nome").value = "";
+      $("new-prestazione-prezzo").value = "";
+      await loadPrestazioni();
+      const data = await res.clone().json();
+      $("prestazione").value = String(data.id);
+      onPrestazioneChange();
+    } catch (e) {
+      showBadge("Errore aggiunta prestazione", "error");
+    }
+  });
+
+  loadClients();
+  loadPrestazioni();
+  onPrestazioneChange();
+})();
+</script>
+</body>
+</html>
