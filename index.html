@@ -225,7 +225,7 @@
   }
 
   VetAuth.init();
-  VetAuth.onAuth((user) => {
+  VetAuth.onAuthChange((user) => {
     if(user) {
       $("login-screen").style.display = "none";
       $("app-container").style.display = "block";
