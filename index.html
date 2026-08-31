@@ -49,7 +49,6 @@
   .stat-card .lbl { font-size: 0.75rem; font-weight: 600; color: var(--muted); text-transform: uppercase; margin-top: 4px; }
   .stat-card .sub-val { font-size: 0.9rem; font-weight: bold; margin-top: 4px; color: var(--green); }
 
-  /* Impostazioni speciali per la stampa / PDF */
   @media print {
     body { background: #fff; padding: 0; }
     #login-screen, #app-container, .badge { display: none !important; }
@@ -69,10 +68,11 @@
   <div class="header">
     <h1>🐾 VetApp</h1>
     <div class="sub">Gestionale Clinica Veterinaria (Offline-First)</div>
-    <div style="margin-top:10px;">
-      <span id="user-info" style="font-weight:bold; margin-right:10px;"></span>
-      <button class="btn ghost" id="logout-btn">Cambia Utente</button>
-      <button class="btn ghost" id="export-btn">📤 Export Dati (JSON)</button>
+    <div style="margin-top:10px; display:flex; flex-wrap:wrap; justify-content:center; gap:8px; align-items:center;">
+      <span id="user-info" style="font-weight:bold;"></span>
+      <button class="btn ghost small" id="logout-btn">Cambia Utente</button>
+      <button class="btn ghost small" id="export-btn">📤 Export (JSON)</button>
+      <label class="btn ghost small" style="cursor:pointer; margin:0;">📥 Importa <input type="file" id="import-file" accept=".json" style="display:none;"></label>
     </div>
     <nav class="header-nav">
       <a class="nav-link active" data-target="nuova-visita-section">📝 Visita</a>
@@ -178,7 +178,6 @@
   </div>
 </div>
 
-<!-- Area usata esclusivamente per la stampa PDF -->
 <div id="print-area" style="display:none;"></div>
 <script src="./static/db.js"></script>
 <script src="./static/auth.js"></script>
@@ -340,7 +339,6 @@
       </div>
     `;
     
-    // Innesca la finestra nativa di stampa (che su mobile permette di salvare come PDF)
     window.print();
   };
 
@@ -409,7 +407,6 @@
     loadClientiAnagrafica(); loadClients();
   };
 
-  // --- MOTORE DI RICERCA CLIENTI ---
   function renderClientiList(dataList) {
     $("clienti-list").innerHTML = dataList.length === 0 ? "Nessun cliente trovato." : 
       dataList.map(c => `<div class="list-item" style="flex-direction:column; align-items:flex-start;">
@@ -503,7 +500,6 @@
     const visite = await VetDB.getAll("visite");
     const listino = await VetDB.getAll("listino");
     
-    // Aggiungo il carattere BOM per far capire a Excel che è un file UTF-8 (per gli accenti)
     let csv = "\uFEFFData,Cliente,Azienda,Prestazione,Prezzo,Note,Stato\n";
     
     visite.forEach(v => {
@@ -527,7 +523,7 @@
     showBadge("Excel Scaricato", "success");
   });
 
-  // --- EXPORT JSON E AUTO-BACKUP ---
+  // --- EXPORT JSON E IMPORT ---
   async function eseguiExportJSON() {
     const b = await VetDB.exportJSON(); 
     const a = document.createElement("a");
@@ -535,7 +531,31 @@
     a.download = "vetapp_backup_" + new Date().toISOString().split('T')[0] + ".json"; 
     a.click();
   }
+
+  // RIPRISTINATO: Click manuale per l'Export JSON in cima
+  $("export-btn").addEventListener("click", () => {
+    eseguiExportJSON();
+    showBadge("Backup JSON scaricato", "success");
+  });
+
+  // RIPRISTINATO: Logica per Importare il JSON
+  $("import-file").addEventListener("change", (e) => {
+    const file = e.target.files[0];
+    if(!file) return;
+    const r = new FileReader();
+    r.onload = async (ev) => { 
+      try {
+        await VetDB.importJSON(JSON.parse(ev.target.result)); 
+        loadClients(); loadPrestazioni(); loadDashboardStats();
+        showBadge("Dati importati con successo!", "success"); 
+      } catch(err) {
+        showBadge("Errore importazione", "error");
+      }
+    };
+    r.readAsText(file);
+  });
   
+  // --- AUTO-BACKUP ---
   $("auto-backup-chk").addEventListener("change", (e) => {
     localStorage.setItem("vet_auto_backup", e.target.checked);
     showBadge(e.target.checked ? "Auto-backup Attivato" : "Auto-backup Disattivato", "success");
