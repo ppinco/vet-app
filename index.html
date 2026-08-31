@@ -40,9 +40,13 @@
   .content-section { display: none; }
   #nuova-visita-section { display: block; }
   .list-item { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border); }
-  .stats-box { display: flex; gap: 10px; margin-bottom: 20px; }
-  .stat-card { flex: 1; background: var(--bg); padding: 15px; border-radius: 8px; text-align: center; }
-  .stat-card .val { font-size: 1.8rem; font-weight: bold; color: var(--primary); }
+  
+  .stats-row { display: flex; gap: 10px; margin-bottom: 15px; }
+  .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 15px; }
+  .stat-card { background: var(--bg); padding: 12px; border-radius: 8px; text-align: center; border: 1px solid var(--border); }
+  .stat-card .val { font-size: 1.5rem; font-weight: bold; color: var(--primary); }
+  .stat-card .lbl { font-size: 0.75rem; font-weight: 600; color: var(--muted); text-transform: uppercase; margin-top: 4px; }
+  .stat-card .sub-val { font-size: 0.9rem; font-weight: bold; margin-top: 4px; color: var(--green); }
 </style>
 </head>
 <body>
@@ -73,15 +77,23 @@
   <div class="badge" id="badge"><span id="badge-text"></span></div>
 
   <div id="nuova-visita-section" class="card content-section">
-    <h2>📋 Registra Visita</h2>
-    <form id="visita-form">
-      <div class="field"><label>Cliente</label><select id="cliente" required></select></div>
-      <div class="field"><label>Prestazione</label><select id="prestazione"><option value="">Personalizzata</option></select></div>
-      <div class="field"><label>Prezzo (€)</label><input type="number" id="prezzo" step="0.01" required></div>
-      <div class="field"><label>Note</label><textarea id="note"></textarea></div>
-      <div class="field"><label>Data</label><input type="date" id="data" required></div>
-      <button type="submit" class="btn primary" id="save-btn">Salva Visita</button>
-    </form>
+    <h2>📋 Registra Sessione Visite</h2>
+    <div class="field"><label>Cliente</label><select id="cliente"></select></div>
+    <div class="field"><label>Data</label><input type="date" id="data"></div>
+    
+    <div style="background: #f9fafb; padding: 12px; border-radius: 8px; margin-bottom: 15px; border: 1px solid var(--border);">
+      <label style="color:var(--primary); font-size:0.95rem;">➕ Aggiungi Prestazione in lista</label>
+      <select id="prestazione" class="field" style="margin-bottom:8px;"><option value="">Personalizzata</option></select>
+      <div style="display:flex; gap:10px;">
+        <input type="number" id="prezzo" step="0.01" placeholder="Prezzo (€)" class="field" style="margin-bottom:8px; flex:1;">
+        <button type="button" class="btn ghost" id="btn-add-cart" style="flex:1;">Aggiungi ⬇️</button>
+      </div>
+      <textarea id="note" placeholder="Note (es. vitello matricola x)..." class="field" style="margin-bottom:0; min-height:50px;"></textarea>
+    </div>
+
+    <div id="cart-list" style="margin-bottom: 15px; border-radius:8px;"></div>
+    <h3 style="text-align:right; margin-bottom: 15px; font-size:1.15rem;">Totale: <span id="cart-total" style="color:var(--primary);">0.00</span>€</h3>
+    <button type="button" class="btn primary" id="save-btn">💾 Salva Visita Completa</button>
   </div>
 
   <div id="clienti-section" class="card content-section">
@@ -109,9 +121,33 @@
 
   <div id="resoconti-section" class="card content-section">
     <h2>📊 Dashboard Statistiche</h2>
-    <div class="stats-box">
-      <div class="stat-card"><div class="val" id="tot-visite">0</div><div>Visite Totali</div></div>
-      <div class="stat-card"><div class="val" id="tot-incasso" style="color:var(--green)">0€</div><div>Incasso Totale</div></div>
+    
+    <label style="font-size:1rem; margin-top:5px;">Stato Fatturazione</label>
+    <div class="stats-row">
+      <div class="stat-card" style="flex:1; border-color:var(--red);">
+        <div class="val" id="tot-da-fatturare" style="color:var(--red);">0€</div>
+        <div class="lbl">Da Incassare</div>
+      </div>
+      <div class="stat-card" style="flex:1; border-color:var(--green);">
+        <div class="val" id="tot-fatturato" style="color:var(--green);">0€</div>
+        <div class="lbl">Fatturato (Archivio)</div>
+      </div>
+    </div>
+
+    <label style="font-size:1rem; margin-top:15px;">Andamento Visite</label>
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="val" id="v-oggi">0</div><div class="lbl">Oggi</div>
+        <div class="sub-val" id="i-oggi">0€</div>
+      </div>
+      <div class="stat-card">
+        <div class="val" id="v-mese">0</div><div class="lbl">Mese</div>
+        <div class="sub-val" id="i-mese">0€</div>
+      </div>
+      <div class="stat-card">
+        <div class="val" id="v-anno">0</div><div class="lbl">Anno</div>
+        <div class="sub-val" id="i-anno">0€</div>
+      </div>
     </div>
   </div>
 </div>
@@ -121,6 +157,7 @@
 (function () {
   const $ = (id) => document.getElementById(id);
   const badge = $("badge");
+  let cart = []; 
   
   function showBadge(text, type) {
     $("badge-text").textContent = text;
@@ -130,7 +167,6 @@
 
   $("data").value = new Date().toISOString().split('T')[0];
 
-  // Navigazione
   document.querySelectorAll('.nav-link').forEach(link => {
     link.addEventListener('click', () => {
       document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
@@ -146,7 +182,7 @@
 
   async function loadClients() {
     const data = await VetDB.getAll("clienti");
-    $("cliente").innerHTML = '<option value="">-- Seleziona --</option>' + 
+    $("cliente").innerHTML = '<option value="">-- Seleziona Azienda/Cliente --</option>' + 
       data.map(c => `<option value="${c.id}">${c.nome} ${c.cognome||''} ${c.azienda ? '('+c.azienda+')' : ''}</option>`).join('');
   }
 
@@ -161,29 +197,111 @@
     $("prezzo").value = opt.dataset.prezzo || "";
   });
 
-  $("visita-form").addEventListener("submit", async (e) => {
-    e.preventDefault();
-    try {
-      await VetDB.put("visite", {
-        id: await VetDB.nextId("visite"),
-        cliente_id: parseInt($("cliente").value),
-        prestazione_id: parseInt($("prestazione").value) || null,
-        prezzo_applicato: parseFloat($("prezzo").value),
-        data: $("data").value,
-        note: $("note").value,
-        fatturata: 0
-      });
-      showBadge("Visita salvata", "success");
-      $("visita-form").reset();
-      $("data").value = new Date().toISOString().split('T')[0];
-    } catch(err) { showBadge("Errore", "error"); }
+  function renderCart() {
+    let tot = 0;
+    if(cart.length === 0) {
+      $("cart-list").innerHTML = ""; $("cart-total").textContent = "0.00"; return;
+    }
+    $("cart-list").innerHTML = cart.map((item, idx) => {
+      tot += item.prezzo;
+      return `<div class="list-item" style="background:#fff; border:1px solid #ddd; padding:10px; margin-bottom:5px; border-radius:8px;">
+        <div style="flex:1;"><b>${item.nomePrest}</b> - <span style="color:var(--primary); font-weight:bold;">${item.prezzo}€</span>
+          ${item.note ? `<br><span style="font-size:0.85rem; color:var(--muted);">${item.note}</span>` : ''}
+        </div>
+        <button type="button" onclick="removeFromCart(${idx})" class="btn ghost small" style="color:var(--red);">X</button>
+      </div>`;
+    }).join('');
+    $("cart-total").textContent = tot.toFixed(2);
+  }
+
+  window.removeFromCart = (idx) => { cart.splice(idx, 1); renderCart(); };
+
+  $("btn-add-cart").addEventListener("click", () => {
+    const pId = $("prestazione").value;
+    const opt = $("prestazione").options[$("prestazione").selectedIndex];
+    const nomePrest = pId ? opt.text.split(" (")[0] : "Personalizzata";
+    const prezzo = parseFloat($("prezzo").value);
+    if(isNaN(prezzo)) return showBadge("Inserisci un prezzo", "error");
+    
+    cart.push({ prestazione_id: pId ? parseInt(pId) : null, nomePrest, prezzo, note: $("note").value.trim() });
+    $("prezzo").value = ""; $("note").value = ""; $("prestazione").value = "";
+    renderCart();
   });
 
-  // Sezione Clienti: Aggiunta e Modifica
+  $("save-btn").addEventListener("click", async () => {
+    const cId = parseInt($("cliente").value); const d = $("data").value;
+    if(!cId || !d || cart.length === 0) return showBadge("Manca Cliente, Data o Prestazioni", "error");
+    
+    try {
+      for(let item of cart) {
+        await VetDB.put("visite", {
+          id: await VetDB.nextId("visite"), cliente_id: cId, prestazione_id: item.prestazione_id,
+          prezzo_applicato: item.prezzo, data: d, note: item.note, fatturata: 0
+        });
+      }
+      showBadge("Visite salvate ✓", "success");
+      cart = []; renderCart(); $("cliente").value = "";
+    } catch(err) { showBadge("Errore salvataggio", "error"); }
+  });
+
+  function formatVisita(v, listino) {
+    const p = listino.find(x => x.id === v.prestazione_id);
+    const n = p ? p.prestazione : "Personalizzata";
+    return `<div style="padding:10px 0; border-bottom:1px solid #eaeaea;">
+      <div style="display:flex; justify-content:space-between;">
+        <b>${v.data}</b> <span style="color:var(--primary); font-weight:bold;">${v.prezzo_applicato}€</span>
+      </div>
+      <div>${n}</div>
+      ${v.note ? `<div style="color:var(--muted); font-size:0.85rem;">📝 ${v.note}</div>` : ''}
+    </div>`;
+  }
+
+  window.saldaVisiteCliente = async (cId) => {
+    if(!confirm("Vuoi archiviare le visite in sospeso? (Verranno segnate come Fatturate e tolte dal conto)")) return;
+    const visite = await VetDB.getAll("visite");
+    const daSaldare = visite.filter(v => v.cliente_id === cId && !v.fatturata);
+    for(let v of daSaldare) {
+      v.fatturata = 1;
+      await VetDB.put("visite", v);
+    }
+    showBadge("Visite Archiviate!", "success");
+    toggleStorico(cId); 
+  };
+
+  window.toggleStorico = async (id) => {
+    const div = $("storico-" + id);
+    if(div.style.display === "block") { div.style.display = "none"; return; }
+    
+    const visite = await VetDB.getAll("visite");
+    const listino = await VetDB.getAll("listino");
+    const stor = visite.filter(v => v.cliente_id === id).sort((a,b) => new Date(b.data) - new Date(a.data));
+    
+    const attive = stor.filter(v => !v.fatturata);
+    const archiviate = stor.filter(v => v.fatturata);
+    
+    let html = "<div style='padding:10px;'>";
+    if(attive.length > 0) {
+      const tot = attive.reduce((sum, v) => sum + Number(v.prezzo_applicato), 0);
+      html += `<div style="display:flex; justify-content:space-between; align-items:center; background:#fee2e2; padding:8px; border-radius:6px; margin-bottom:10px;">
+        <b style="color:var(--red);">Sospeso: ${tot.toFixed(2)}€</b>
+        <button onclick="saldaVisiteCliente(${id})" class="btn primary small" style="width:auto; background:var(--green);">Segna Fatturate</button>
+      </div>`;
+      html += attive.map(v => formatVisita(v, listino)).join("");
+    } else {
+      html += `<div style="color:var(--green); font-weight:bold; margin-bottom:10px;">✓ Tutto saldato (Nessun sospeso)</div>`;
+    }
+    
+    if(archiviate.length > 0) {
+      html += `<div style="margin-top:15px; font-weight:bold; color:var(--muted);">Archivio (Già Fatturate):</div>`;
+      html += archiviate.map(v => formatVisita(v, listino)).join("");
+    }
+    
+    div.innerHTML = html + "</div>";
+    div.style.display = "block";
+  };
+
   $("btn-add-anagrafica-cliente").addEventListener("click", async () => {
-    const nome = $("anagrafica-nome").value.trim();
-    const cognome = $("anagrafica-cognome").value.trim();
-    const azienda = $("anagrafica-azienda").value.trim();
+    const nome = $("anagrafica-nome").value.trim(); const cognome = $("anagrafica-cognome").value.trim(); const azienda = $("anagrafica-azienda").value.trim();
     if(!nome) return showBadge("Nome obbligatorio", "error");
     await VetDB.put("clienti", { id: await VetDB.nextId("clienti"), nome, cognome, azienda });
     $("anagrafica-nome").value = ""; $("anagrafica-cognome").value = ""; $("anagrafica-azienda").value = "";
@@ -191,14 +309,9 @@
   });
 
   window.modificaCliente = async (id) => {
-    const data = await VetDB.getAll("clienti");
-    const c = data.find(x => x.id === id);
-    if(!c) return;
-    const nuovoNome = prompt("Nome:", c.nome);
-    if (nuovoNome === null) return;
-    const nuovoCognome = prompt("Cognome:", c.cognome || "");
-    const nuovaAzienda = prompt("Ragione Sociale / Azienda:", c.azienda || "");
-    await VetDB.put("clienti", { ...c, nome: nuovoNome, cognome: nuovoCognome, azienda: nuovaAzienda });
+    const data = await VetDB.getAll("clienti"); const c = data.find(x => x.id === id); if(!c) return;
+    const nNome = prompt("Nome:", c.nome); if (nNome === null) return;
+    await VetDB.put("clienti", { ...c, nome: nNome, cognome: prompt("Cognome:", c.cognome || ""), azienda: prompt("Azienda:", c.azienda || "") });
     loadClientiAnagrafica(); loadClients();
   };
 
@@ -206,95 +319,82 @@
     const data = await VetDB.getAll("clienti");
     $("clienti-list").innerHTML = data.length === 0 ? "Nessun cliente salvato." : 
       data.map(c => `<div class="list-item" style="flex-direction:column; align-items:flex-start;">
-        <div style="display:flex; justify-content:space-between; width:100%;">
-          <b>${c.nome} ${c.cognome||''}</b>
-          <button onclick="modificaCliente(${c.id})" class="btn ghost small">Modifica</button>
+        <div style="display:flex; justify-content:space-between; width:100%; align-items:center;">
+          <div>
+            <b style="font-size:1.05rem;">${c.nome} ${c.cognome||''}</b>
+            ${c.azienda ? `<div style="font-size:0.85rem; color:var(--muted);">🏢 ${c.azienda}</div>` : ''}
+          </div>
+          <div style="display:flex; gap:5px;">
+            <button onclick="toggleStorico(${c.id})" class="btn ghost small">Storico / Fatture</button>
+            <button onclick="modificaCliente(${c.id})" class="btn ghost small">Modif.</button>
+          </div>
         </div>
-        <div style="font-size:0.85rem; color:var(--muted); margin-top:4px;">${c.azienda ? '🏢 ' + c.azienda : ''}</div>
+        <div id="storico-${c.id}" style="display:none; width:100%; margin-top:10px; background:#f9fafb; border-radius:8px; border:1px solid var(--border); max-height: 280px; overflow-y: auto;"></div>
       </div>`).join('');
   }
 
-  // Sezione Listino: Aggiunta, Modifica ed Eliminazione
   $("btn-add-listino-prest").addEventListener("click", async () => {
-    const nome = $("listino-nome").value.trim();
-    const prezzo = parseFloat($("listino-prezzo").value);
-    if(!nome || isNaN(prezzo)) return showBadge("Dati non validi", "error");
-    await VetDB.put("listino", { id: await VetDB.nextId("listino"), prestazione: nome, prezzo_base: prezzo });
-    $("listino-nome").value = ""; $("listino-prezzo").value = "";
-    loadListinoGestione(); loadPrestazioni(); showBadge("Prestazione aggiunta", "success");
+    const n = $("listino-nome").value.trim(); const p = parseFloat($("listino-prezzo").value);
+    if(!n || isNaN(p)) return showBadge("Dati non validi", "error");
+    await VetDB.put("listino", { id: await VetDB.nextId("listino"), prestazione: n, prezzo_base: p });
+    $("listino-nome").value = ""; $("listino-prezzo").value = ""; loadListinoGestione(); loadPrestazioni(); showBadge("Aggiunta", "success");
   });
 
   window.modificaPrestazione = async (id) => {
-    const data = await VetDB.getAll("listino");
-    const p = data.find(x => x.id === id);
-    if(!p) return;
-    const nuovoNome = prompt("Nome Prestazione:", p.prestazione);
-    if (nuovoNome === null) return;
-    const nuovoPrezzo = prompt("Prezzo (€):", p.prezzo_base);
-    if (nuovoPrezzo === null) return;
-    await VetDB.put("listino", { ...p, prestazione: nuovoNome, prezzo_base: parseFloat(nuovoPrezzo) || 0 });
-    loadListinoGestione(); loadPrestazioni();
+    const data = await VetDB.getAll("listino"); const p = data.find(x => x.id === id); if(!p) return;
+    const nN = prompt("Nome Prestazione:", p.prestazione); if (nN === null) return;
+    const nP = prompt("Prezzo (€):", p.prezzo_base); if (nP === null) return;
+    await VetDB.put("listino", { ...p, prestazione: nN, prezzo_base: parseFloat(nP) || 0 }); loadListinoGestione(); loadPrestazioni();
   };
-
   window.eliminaPrestazione = async (id) => {
-    if(confirm("Eliminare la prestazione dal listino?")) {
-      await VetDB.deleteItem("listino", id);
-      loadListinoGestione(); loadPrestazioni();
-    }
+    if(confirm("Eliminare?")) { await VetDB.deleteItem("listino", id); loadListinoGestione(); loadPrestazioni(); }
   };
-
   async function loadListinoGestione() {
     const data = await VetDB.getAll("listino");
-    $("listino-list").innerHTML = data.length === 0 ? "Listino vuoto." : 
-      data.map(p => `<div class="list-item">
-        <span>${p.prestazione} (<b>${p.prezzo_base}€</b>)</span>
-        <div>
-          <button onclick="modificaPrestazione(${p.id})" class="btn ghost small">Modifica</button>
-          <button onclick="eliminaPrestazione(${p.id})" class="btn ghost small" style="color:var(--red)">Elimina</button>
-        </div>
-      </div>`).join('');
+    $("listino-list").innerHTML = data.length === 0 ? "Vuoto." : data.map(p => `<div class="list-item">
+      <span>${p.prestazione} (<b>${p.prezzo_base}€</b>)</span><div>
+      <button onclick="modificaPrestazione(${p.id})" class="btn ghost small">Mod</button>
+      <button onclick="eliminaPrestazione(${p.id})" class="btn ghost small" style="color:var(--red)">X</button>
+    </div></div>`).join('');
   }
 
-  // Dashboard
   async function loadDashboardStats() {
     const visite = await VetDB.getAll("visite");
-    const incasso = visite.reduce((sum, v) => sum + Number(v.prezzo_applicato), 0);
-    $("tot-visite").textContent = visite.length;
-    $("tot-incasso").textContent = incasso.toFixed(2) + "€";
+    const tStr = new Date().toISOString().split('T')[0];
+    const mStr = tStr.substring(0, 7);
+    const yStr = tStr.substring(0, 4);
+
+    let vO=0, iO=0, vM=0, iM=0, vY=0, iY=0, totD=0, totF=0;
+    
+    visite.forEach(v => {
+      const p = Number(v.prezzo_applicato) || 0;
+      if(v.fatturata) totF += p; else totD += p;
+      if(v.data === tStr) { vO++; iO+=p; }
+      if(v.data.startsWith(mStr)) { vM++; iM+=p; }
+      if(v.data.startsWith(yStr)) { vY++; iY+=p; }
+    });
+
+    $("tot-da-fatturare").textContent = totD.toFixed(2) + "€"; $("tot-fatturato").textContent = totF.toFixed(2) + "€";
+    $("v-oggi").textContent = vO; $("i-oggi").textContent = iO.toFixed(2) + "€";
+    $("v-mese").textContent = vM; $("i-mese").textContent = iM.toFixed(2) + "€";
+    $("v-anno").textContent = vY; $("i-anno").textContent = iY.toFixed(2) + "€";
   }
 
-  // Init & Auth
   VetAuth.init();
-  VetAuth.onAuthChange((user) => {
-    if(user) {
-      $("login-screen").style.display = "none";
-      $("app-container").style.display = "block";
-      $("user-info").textContent = user.name;
-      loadClients(); loadPrestazioni();
-    } else {
-      $("login-screen").style.display = "flex";
-      $("app-container").style.display = "none";
-    }
+  VetAuth.onAuthChange((u) => {
+    if(u) { $("login-screen").style.display = "none"; $("app-container").style.display = "block"; $("user-info").textContent = u.name; loadClients(); loadPrestazioni(); } 
+    else { $("login-screen").style.display = "flex"; $("app-container").style.display = "none"; }
   });
-
-  $("login-btn-main").addEventListener("click", VetAuth.login);
-  $("logout-btn").addEventListener("click", VetAuth.logout);
-
+  $("login-btn-main").addEventListener("click", VetAuth.login); $("logout-btn").addEventListener("click", VetAuth.logout);
+  
   $("export-btn").addEventListener("click", async () => {
-    const backup = await VetDB.exportJSON();
-    const blob = new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" });
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = "vetapp_backup_" + new Date().toISOString().split('T')[0] + ".json";
-    a.click();
+    const b = await VetDB.exportJSON(); const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([JSON.stringify(b, null, 2)], { type: "application/json" }));
+    a.download = "vetapp_backup_" + new Date().toISOString().split('T')[0] + ".json"; a.click();
   });
-
   $("import-file").addEventListener("change", (e) => {
     const r = new FileReader();
-    r.onload = async (ev) => {
-      await VetDB.importJSON(JSON.parse(ev.target.result));
-      loadClients(); loadPrestazioni(); showBadge("Dati importati!", "success");
-    };
+    r.onload = async (ev) => { await VetDB.importJSON(JSON.parse(ev.target.result)); loadClients(); loadPrestazioni(); showBadge("Dati importati!", "success"); };
     r.readAsText(e.target.files[0]);
   });
 })();
