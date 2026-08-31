@@ -27,6 +27,7 @@
   label { display: block; font-size: .85rem; font-weight: 600; margin-bottom: 5px; }
   .field { margin-bottom: 14px; }
   input, select, textarea { width: 100%; padding: 11px; border: 1px solid var(--border); border-radius: 8px; font-size: 1rem; }
+  input[type="checkbox"] { width: 22px; height: 22px; cursor: pointer; accent-color: var(--green); }
   .btn { width: 100%; padding: 13px; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; background: var(--primary); color: #fff; }
   .btn.ghost { background: #fff; color: var(--primary); border: 1px solid var(--border); width: auto; padding: 8px 12px; }
   .btn.small { padding: 8px; width: auto; font-size: .9rem; }
@@ -120,33 +121,48 @@
   </div>
 
   <div id="resoconti-section" class="card content-section">
-    <h2>📊 Dashboard Statistiche</h2>
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+      <h2 style="margin: 0;">📊 Statistiche</h2>
+      <button id="toggle-privacy-btn" class="btn ghost small">👁️ Nascondi</button>
+    </div>
     
-    <label style="font-size:1rem; margin-top:5px;">Stato Fatturazione</label>
-    <div class="stats-row">
-      <div class="stat-card" style="flex:1; border-color:var(--red);">
-        <div class="val" id="tot-da-fatturare" style="color:var(--red);">0€</div>
-        <div class="lbl">Da Incassare</div>
+    <div id="stats-content">
+      <label style="font-size:1rem; margin-top:5px;">Stato Fatturazione</label>
+      <div class="stats-row">
+        <div class="stat-card" style="flex:1; border-color:var(--red);">
+          <div class="val" id="tot-da-fatturare" style="color:var(--red);">0€</div>
+          <div class="lbl">Da Incassare</div>
+        </div>
+        <div class="stat-card" style="flex:1; border-color:var(--green);">
+          <div class="val" id="tot-fatturato" style="color:var(--green);">0€</div>
+          <div class="lbl">Fatturato (Archivio)</div>
+        </div>
       </div>
-      <div class="stat-card" style="flex:1; border-color:var(--green);">
-        <div class="val" id="tot-fatturato" style="color:var(--green);">0€</div>
-        <div class="lbl">Fatturato (Archivio)</div>
+
+      <label style="font-size:1rem; margin-top:15px;">Andamento Visite</label>
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="val" id="v-oggi">0</div><div class="lbl">Oggi</div>
+          <div class="sub-val" id="i-oggi">0€</div>
+        </div>
+        <div class="stat-card">
+          <div class="val" id="v-mese">0</div><div class="lbl">Mese</div>
+          <div class="sub-val" id="i-mese">0€</div>
+        </div>
+        <div class="stat-card">
+          <div class="val" id="v-anno">0</div><div class="lbl">Anno</div>
+          <div class="sub-val" id="i-anno">0€</div>
+        </div>
       </div>
     </div>
-
-    <label style="font-size:1rem; margin-top:15px;">Andamento Visite</label>
-    <div class="stats-grid">
-      <div class="stat-card">
-        <div class="val" id="v-oggi">0</div><div class="lbl">Oggi</div>
-        <div class="sub-val" id="i-oggi">0€</div>
-      </div>
-      <div class="stat-card">
-        <div class="val" id="v-mese">0</div><div class="lbl">Mese</div>
-        <div class="sub-val" id="i-mese">0€</div>
-      </div>
-      <div class="stat-card">
-        <div class="val" id="v-anno">0</div><div class="lbl">Anno</div>
-        <div class="sub-val" id="i-anno">0€</div>
+    
+    <div style="margin-top: 25px; padding: 15px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px;">
+      <label style="display:flex; align-items:center; gap:8px; cursor:pointer; margin:0; font-size:1rem;">
+        <input type="checkbox" id="auto-backup-chk">
+        <b>💾 Backup Automatico Giornaliero</b>
+      </label>
+      <div style="font-size:0.85rem; color:var(--muted); margin-top:6px;">
+        Se attivo, il tablet scaricherà da solo il file di sicurezza la prima volta che apri l'app ogni giorno.
       </div>
     </div>
   </div>
@@ -163,6 +179,13 @@
     $("badge-text").textContent = text;
     badge.className = "badge show " + type;
     setTimeout(() => badge.classList.remove("show"), 3000);
+  }
+
+  function formatDateITA(dStr) {
+    if(!dStr) return "";
+    const p = dStr.split('-');
+    if(p.length !== 3) return dStr;
+    return `${p[2]}/${p[1]}/${p[0]}`;
   }
 
   $("data").value = new Date().toISOString().split('T')[0];
@@ -244,27 +267,43 @@
     } catch(err) { showBadge("Errore salvataggio", "error"); }
   });
 
-  function formatVisita(v, listino) {
+  function formatVisitaStorico(v, listino, isUnpaid) {
     const p = listino.find(x => x.id === v.prestazione_id);
     const n = p ? p.prestazione : "Personalizzata";
-    return `<div style="padding:10px 0; border-bottom:1px solid #eaeaea;">
-      <div style="display:flex; justify-content:space-between;">
-        <b>${v.data}</b> <span style="color:var(--primary); font-weight:bold;">${v.prezzo_applicato}€</span>
+    const dIta = formatDateITA(v.data);
+    const col = isUnpaid ? 'var(--red)' : 'var(--green)';
+    
+    const checkHtml = isUnpaid 
+      ? `<input type="checkbox" class="chk-salda-${v.cliente_id}" value="${v.id}" style="margin-right:12px;">` 
+      : ``;
+
+    return `<div style="padding:10px 0; border-bottom:1px solid #eaeaea; display:flex; align-items:center;">
+      ${checkHtml}
+      <div style="flex:1;">
+        <div style="display:flex; justify-content:space-between;">
+          <b>${dIta}</b> <span style="color:${col}; font-weight:bold;">${v.prezzo_applicato}€</span>
+        </div>
+        <div>${n}</div>
+        ${v.note ? `<div style="color:var(--muted); font-size:0.85rem;">📝 ${v.note}</div>` : ''}
       </div>
-      <div>${n}</div>
-      ${v.note ? `<div style="color:var(--muted); font-size:0.85rem;">📝 ${v.note}</div>` : ''}
     </div>`;
   }
 
-  window.saldaVisiteCliente = async (cId) => {
-    if(!confirm("Vuoi archiviare le visite in sospeso? (Verranno segnate come Fatturate e tolte dal conto)")) return;
+  window.saldaSelezionate = async (cId) => {
+    const checkboxes = document.querySelectorAll(`.chk-salda-${cId}:checked`);
+    if(checkboxes.length === 0) return alert("Spunta almeno una visita da segnare come pagata/fatturata.");
+    if(!confirm(`Confermi di segnare come pagate/archiviate ${checkboxes.length} visite?`)) return;
+
     const visite = await VetDB.getAll("visite");
-    const daSaldare = visite.filter(v => v.cliente_id === cId && !v.fatturata);
-    for(let v of daSaldare) {
-      v.fatturata = 1;
-      await VetDB.put("visite", v);
+    const idsToPay = Array.from(checkboxes).map(c => parseInt(c.value));
+
+    for(let v of visite) {
+      if(idsToPay.includes(v.id)) {
+        v.fatturata = 1;
+        await VetDB.put("visite", v);
+      }
     }
-    showBadge("Visite Archiviate!", "success");
+    showBadge("Visite aggiornate!", "success");
     toggleStorico(cId); 
   };
 
@@ -283,17 +322,17 @@
     if(attive.length > 0) {
       const tot = attive.reduce((sum, v) => sum + Number(v.prezzo_applicato), 0);
       html += `<div style="display:flex; justify-content:space-between; align-items:center; background:#fee2e2; padding:8px; border-radius:6px; margin-bottom:10px;">
-        <b style="color:var(--red);">Sospeso: ${tot.toFixed(2)}€</b>
-        <button onclick="saldaVisiteCliente(${id})" class="btn primary small" style="width:auto; background:var(--green);">Segna Fatturate</button>
+        <b style="color:var(--red);">Da Pagare: ${tot.toFixed(2)}€</b>
+        <button onclick="saldaSelezionate(${id})" class="btn primary small" style="width:auto; background:var(--green);">Salda Selezionate</button>
       </div>`;
-      html += attive.map(v => formatVisita(v, listino)).join("");
+      html += attive.map(v => formatVisitaStorico(v, listino, true)).join("");
     } else {
-      html += `<div style="color:var(--green); font-weight:bold; margin-bottom:10px;">✓ Tutto saldato (Nessun sospeso)</div>`;
+      html += `<div style="color:var(--green); font-weight:bold; margin-bottom:10px;">✓ Tutto saldato (Nessun debito)</div>`;
     }
     
     if(archiviate.length > 0) {
-      html += `<div style="margin-top:15px; font-weight:bold; color:var(--muted);">Archivio (Già Fatturate):</div>`;
-      html += archiviate.map(v => formatVisita(v, listino)).join("");
+      html += `<div style="margin-top:15px; font-weight:bold; color:var(--muted);">Archivio (Già Pagate/Fatturate):</div>`;
+      html += archiviate.map(v => formatVisitaStorico(v, listino, false)).join("");
     }
     
     div.innerHTML = html + "</div>";
@@ -329,7 +368,7 @@
             <button onclick="modificaCliente(${c.id})" class="btn ghost small">Modif.</button>
           </div>
         </div>
-        <div id="storico-${c.id}" style="display:none; width:100%; margin-top:10px; background:#f9fafb; border-radius:8px; border:1px solid var(--border); max-height: 280px; overflow-y: auto;"></div>
+        <div id="storico-${c.id}" style="display:none; width:100%; margin-top:10px; background:#f9fafb; border-radius:8px; border:1px solid var(--border); max-height: 350px; overflow-y: auto;"></div>
       </div>`).join('');
   }
 
@@ -358,6 +397,17 @@
     </div></div>`).join('');
   }
 
+  $("toggle-privacy-btn").addEventListener("click", () => {
+    const content = $("stats-content");
+    if(content.style.display === "none") {
+      content.style.display = "block";
+      $("toggle-privacy-btn").innerHTML = "👁️ Nascondi";
+    } else {
+      content.style.display = "none";
+      $("toggle-privacy-btn").innerHTML = "👁️ Mostra";
+    }
+  });
+
   async function loadDashboardStats() {
     const visite = await VetDB.getAll("visite");
     const tStr = new Date().toISOString().split('T')[0];
@@ -380,18 +430,55 @@
     $("v-anno").textContent = vY; $("i-anno").textContent = iY.toFixed(2) + "€";
   }
 
-  VetAuth.init();
-  VetAuth.onAuthChange((u) => {
-    if(u) { $("login-screen").style.display = "none"; $("app-container").style.display = "block"; $("user-info").textContent = u.name; loadClients(); loadPrestazioni(); } 
-    else { $("login-screen").style.display = "flex"; $("app-container").style.display = "none"; }
-  });
-  $("login-btn-main").addEventListener("click", VetAuth.login); $("logout-btn").addEventListener("click", VetAuth.logout);
+  // --- LOGICA EXPORT/AUTO-BACKUP ---
+  async function eseguiExport() {
+    const b = await VetDB.exportJSON(); 
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([JSON.stringify(b, null, 2)], { type: "application/json" }));
+    a.download = "vetapp_backup_" + new Date().toISOString().split('T')[0] + ".json"; 
+    a.click();
+  }
   
   $("export-btn").addEventListener("click", async () => {
-    const b = await VetDB.exportJSON(); const a = document.createElement("a");
-    a.href = URL.createObjectURL(new Blob([JSON.stringify(b, null, 2)], { type: "application/json" }));
-    a.download = "vetapp_backup_" + new Date().toISOString().split('T')[0] + ".json"; a.click();
+    await eseguiExport();
+    showBadge("Backup manuale esportato", "success");
   });
+
+  $("auto-backup-chk").addEventListener("change", (e) => {
+    localStorage.setItem("vet_auto_backup", e.target.checked);
+    showBadge(e.target.checked ? "Auto-backup Attivato" : "Auto-backup Disattivato", "success");
+  });
+
+  function checkAutoBackup() {
+    const isAuto = localStorage.getItem("vet_auto_backup") === "true";
+    $("auto-backup-chk").checked = isAuto;
+    if(isAuto) {
+      const today = new Date().toISOString().split('T')[0];
+      if(localStorage.getItem("vet_last_backup_date") !== today) {
+        setTimeout(() => {
+          eseguiExport();
+          localStorage.setItem("vet_last_backup_date", today);
+          showBadge("Backup automatico scaricato ✓", "success");
+        }, 2000); // Ritardo per non intralciare il caricamento della grafica
+      }
+    }
+  }
+
+  VetAuth.init();
+  VetAuth.onAuthChange((u) => {
+    if(u) { 
+      $("login-screen").style.display = "none"; 
+      $("app-container").style.display = "block"; 
+      $("user-info").textContent = u.name; 
+      loadClients(); loadPrestazioni(); 
+      checkAutoBackup(); // Controlla il backup quando entri
+    } 
+    else { $("login-screen").style.display = "flex"; $("app-container").style.display = "none"; }
+  });
+  
+  $("login-btn-main").addEventListener("click", VetAuth.login); 
+  $("logout-btn").addEventListener("click", VetAuth.logout);
+  
   $("import-file").addEventListener("change", (e) => {
     const r = new FileReader();
     r.onload = async (ev) => { await VetDB.importJSON(JSON.parse(ev.target.result)); loadClients(); loadPrestazioni(); showBadge("Dati importati!", "success"); };
