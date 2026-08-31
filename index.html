@@ -82,27 +82,28 @@
       <div class="field"><label>Data</label><input type="date" id="data" required></div>
       <button type="submit" class="btn primary" id="save-btn">Salva Visita</button>
     </form>
-    <div style="margin-top: 20px; border-top: 1px solid var(--border); padding-top: 15px;">
-      <p style="font-size:0.9rem; font-weight:bold;">Aggiunta Rapida:</p>
-      <div style="display:flex; gap:5px; margin-top:5px;">
-        <input type="text" id="new-cliente-nome" placeholder="Nuovo Cliente (Nome Cognome)">
-        <button class="btn ghost" id="add-cliente-btn">Salva</button>
-      </div>
-      <div style="display:flex; gap:5px; margin-top:5px;">
-        <input type="text" id="new-prestazione-nome" placeholder="Nuova Prestazione">
-        <input type="number" id="new-prestazione-prezzo" placeholder="€" style="width:70px;">
-        <button class="btn ghost" id="add-prestazione-btn">Salva</button>
-      </div>
-    </div>
   </div>
 
   <div id="clienti-section" class="card content-section">
     <h2>🐶 Anagrafica Clienti</h2>
+    <div style="margin-bottom: 15px; padding-bottom: 15px; border-bottom: 1px solid var(--border);">
+      <label>Aggiungi Nuovo Cliente</label>
+      <input type="text" id="anagrafica-nome" placeholder="Nome" class="field" style="margin-bottom:5px;">
+      <input type="text" id="anagrafica-cognome" placeholder="Cognome" class="field" style="margin-bottom:5px;">
+      <input type="text" id="anagrafica-azienda" placeholder="Ragione Sociale / Azienda (Opzionale)" class="field" style="margin-bottom:10px;">
+      <button class="btn ghost small" id="btn-add-anagrafica-cliente">Salva Cliente</button>
+    </div>
     <div id="clienti-list">Caricamento...</div>
   </div>
 
   <div id="listino-section" class="card content-section">
     <h2>💲 Gestione Listino</h2>
+    <div style="margin-bottom: 15px; padding-bottom: 15px; border-bottom: 1px solid var(--border);">
+      <label>Aggiungi Nuova Prestazione</label>
+      <input type="text" id="listino-nome" placeholder="Nome Prestazione" class="field" style="margin-bottom:5px;">
+      <input type="number" id="listino-prezzo" placeholder="Prezzo (€)" step="0.01" class="field" style="margin-bottom:10px;">
+      <button class="btn ghost small" id="btn-add-listino-prest">Salva Prestazione</button>
+    </div>
     <div id="listino-list">Caricamento...</div>
   </div>
 
@@ -146,7 +147,7 @@
   async function loadClients() {
     const data = await VetDB.getAll("clienti");
     $("cliente").innerHTML = '<option value="">-- Seleziona --</option>' + 
-      data.map(c => `<option value="${c.id}">${c.nome} ${c.cognome||''}</option>`).join('');
+      data.map(c => `<option value="${c.id}">${c.nome} ${c.cognome||''} ${c.azienda ? '('+c.azienda+')' : ''}</option>`).join('');
   }
 
   async function loadPrestazioni() {
@@ -178,28 +179,62 @@
     } catch(err) { showBadge("Errore", "error"); }
   });
 
-  $("add-cliente-btn").addEventListener("click", async () => {
-    const parts = $("new-cliente-nome").value.trim().split(" ");
-    if(!parts[0]) return;
-    await VetDB.put("clienti", { id: await VetDB.nextId("clienti"), nome: parts[0], cognome: parts.slice(1).join(" ") });
-    $("new-cliente-nome").value = "";
-    loadClients(); showBadge("Cliente aggiunto", "success");
+  // Sezione Clienti: Aggiunta e Modifica
+  $("btn-add-anagrafica-cliente").addEventListener("click", async () => {
+    const nome = $("anagrafica-nome").value.trim();
+    const cognome = $("anagrafica-cognome").value.trim();
+    const azienda = $("anagrafica-azienda").value.trim();
+    if(!nome) return showBadge("Nome obbligatorio", "error");
+    await VetDB.put("clienti", { id: await VetDB.nextId("clienti"), nome, cognome, azienda });
+    $("anagrafica-nome").value = ""; $("anagrafica-cognome").value = ""; $("anagrafica-azienda").value = "";
+    loadClientiAnagrafica(); loadClients(); showBadge("Cliente aggiunto", "success");
   });
 
-  $("add-prestazione-btn").addEventListener("click", async () => {
-    const nome = $("new-prestazione-nome").value;
-    const prezzo = parseFloat($("new-prestazione-prezzo").value);
-    if(!nome || isNaN(prezzo)) return;
-    await VetDB.put("listino", { id: await VetDB.nextId("listino"), prestazione: nome, prezzo_base: prezzo });
-    $("new-prestazione-nome").value = ""; $("new-prestazione-prezzo").value = "";
-    loadPrestazioni(); showBadge("Prestazione aggiunta", "success");
-  });
+  window.modificaCliente = async (id) => {
+    const data = await VetDB.getAll("clienti");
+    const c = data.find(x => x.id === id);
+    if(!c) return;
+    const nuovoNome = prompt("Nome:", c.nome);
+    if (nuovoNome === null) return;
+    const nuovoCognome = prompt("Cognome:", c.cognome || "");
+    const nuovaAzienda = prompt("Ragione Sociale / Azienda:", c.azienda || "");
+    await VetDB.put("clienti", { ...c, nome: nuovoNome, cognome: nuovoCognome, azienda: nuovaAzienda });
+    loadClientiAnagrafica(); loadClients();
+  };
 
   async function loadClientiAnagrafica() {
     const data = await VetDB.getAll("clienti");
     $("clienti-list").innerHTML = data.length === 0 ? "Nessun cliente salvato." : 
-      data.map(c => `<div class="list-item"><b>${c.nome} ${c.cognome||''}</b></div>`).join('');
+      data.map(c => `<div class="list-item" style="flex-direction:column; align-items:flex-start;">
+        <div style="display:flex; justify-content:space-between; width:100%;">
+          <b>${c.nome} ${c.cognome||''}</b>
+          <button onclick="modificaCliente(${c.id})" class="btn ghost small">Modifica</button>
+        </div>
+        <div style="font-size:0.85rem; color:var(--muted); margin-top:4px;">${c.azienda ? '🏢 ' + c.azienda : ''}</div>
+      </div>`).join('');
   }
+
+  // Sezione Listino: Aggiunta, Modifica ed Eliminazione
+  $("btn-add-listino-prest").addEventListener("click", async () => {
+    const nome = $("listino-nome").value.trim();
+    const prezzo = parseFloat($("listino-prezzo").value);
+    if(!nome || isNaN(prezzo)) return showBadge("Dati non validi", "error");
+    await VetDB.put("listino", { id: await VetDB.nextId("listino"), prestazione: nome, prezzo_base: prezzo });
+    $("listino-nome").value = ""; $("listino-prezzo").value = "";
+    loadListinoGestione(); loadPrestazioni(); showBadge("Prestazione aggiunta", "success");
+  });
+
+  window.modificaPrestazione = async (id) => {
+    const data = await VetDB.getAll("listino");
+    const p = data.find(x => x.id === id);
+    if(!p) return;
+    const nuovoNome = prompt("Nome Prestazione:", p.prestazione);
+    if (nuovoNome === null) return;
+    const nuovoPrezzo = prompt("Prezzo (€):", p.prezzo_base);
+    if (nuovoPrezzo === null) return;
+    await VetDB.put("listino", { ...p, prestazione: nuovoNome, prezzo_base: parseFloat(nuovoPrezzo) || 0 });
+    loadListinoGestione(); loadPrestazioni();
+  };
 
   window.eliminaPrestazione = async (id) => {
     if(confirm("Eliminare la prestazione dal listino?")) {
@@ -213,10 +248,14 @@
     $("listino-list").innerHTML = data.length === 0 ? "Listino vuoto." : 
       data.map(p => `<div class="list-item">
         <span>${p.prestazione} (<b>${p.prezzo_base}€</b>)</span>
-        <button onclick="eliminaPrestazione(${p.id})" class="btn ghost small" style="color:var(--red)">Elimina</button>
+        <div>
+          <button onclick="modificaPrestazione(${p.id})" class="btn ghost small">Modifica</button>
+          <button onclick="eliminaPrestazione(${p.id})" class="btn ghost small" style="color:var(--red)">Elimina</button>
+        </div>
       </div>`).join('');
   }
 
+  // Dashboard
   async function loadDashboardStats() {
     const visite = await VetDB.getAll("visite");
     const incasso = visite.reduce((sum, v) => sum + Number(v.prezzo_applicato), 0);
@@ -224,6 +263,7 @@
     $("tot-incasso").textContent = incasso.toFixed(2) + "€";
   }
 
+  // Init & Auth
   VetAuth.init();
   VetAuth.onAuthChange((user) => {
     if(user) {
